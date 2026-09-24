@@ -220,6 +220,88 @@ class RollSelectorTest {
 	}
 
 	@Test
+	void vetoedPickIsTreatedLikeACappedOne() {
+		RollVeto noGrowing = c -> c.spec() == Caps.SCALE && c.direction() == Direction.UP;
+		List<Integer> bounds = new ArrayList<>();
+		// scale UP vetoed -> scale leaves the candidates; index 0 of the rest = gravity, UP
+		Applied a = assertInstanceOf(Applied.class,
+				RollSelector.random(PlayerStacks.EMPTY, BaseLookup.VANILLA, recording(bounds, 0, 0, 0, 0), noGrowing));
+		assertSame(Caps.GRAVITY, a.spec());
+		assertEquals(Direction.UP, a.direction());
+		assertEquals(List.of(20, 2, 19, 2), bounds);
+		// scale DOWN is not vetoed
+		Applied down = assertInstanceOf(Applied.class,
+				RollSelector.random(PlayerStacks.EMPTY, BaseLookup.VANILLA, scripted(0, 1), noGrowing));
+		assertSame(Caps.SCALE, down.spec());
+
+		Capped c = assertInstanceOf(Capped.class,
+				RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, new Recipe(Caps.SCALE, Direction.UP), noGrowing));
+		assertEquals(0, c.steps());
+		assertEquals(100.0, c.displayNow(), 1e-9);
+		assertInstanceOf(Applied.class,
+				RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, new Recipe(Caps.SCALE, Direction.DOWN), noGrowing));
+	}
+
+	@Test
+	void vetoedPairsAreLeftOutOfTheFallback() {
+		List<AttributeSpec> specs = List.of(SMALL, OTHER);
+		RollVeto noSmall = c -> c.spec() == SMALL;
+		// SMALL DOWN capped, OTHER DOWN capped; fallback pairs = [OTHER UP] only (SMALL UP is vetoed)
+		List<Integer> bounds = new ArrayList<>();
+		Applied a = assertInstanceOf(Applied.class,
+				RollSelector.random(specs, PlayerStacks.EMPTY, BaseLookup.VANILLA, recording(bounds, 0, 1, 0, 1, 0), noSmall));
+		assertSame(OTHER, a.spec());
+		assertEquals(Direction.UP, a.direction());
+		assertEquals(List.of(2, 2, 1, 2, 1), bounds);
+		assertSame(RollOutcome.Nothing.INSTANCE,
+				RollSelector.random(specs, PlayerStacks.EMPTY, BaseLookup.VANILLA, scripted(0, 0, 0, 0), c -> true));
+	}
+
+	@Test
+	void vetoOr() {
+		RollVeto scale = c -> c.spec() == Caps.SCALE;
+		RollVeto up = c -> c.direction() == Direction.UP;
+		Applied scaleDown = new Applied(Caps.SCALE, Direction.DOWN, 0, -1, 1.0);
+		Applied luckUp = new Applied(Caps.LUCK, Direction.UP, 0, 1, 0.0);
+		Applied luckDown = new Applied(Caps.LUCK, Direction.DOWN, 0, -1, 0.0);
+		assertTrue(scale.or(up).vetoes(scaleDown));
+		assertTrue(scale.or(up).vetoes(luckUp));
+		assertTrue(!scale.or(up).vetoes(luckDown));
+		assertTrue(!RollVeto.NONE.vetoes(luckUp));
+	}
+
+	@Test
+	void mobilityGuardAlwaysApplies() {
+		// jump 90% at vanilla gravity and step height: 1.047-block jump < 1.05 -> vetoed in both modes
+		Recipe jumpDown = new Recipe(Caps.JUMP_STRENGTH, Direction.DOWN);
+		Capped c = assertInstanceOf(Capped.class, RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, jumpDown));
+		assertEquals(100.0, c.displayNow(), 1e-9);
+		int jump = Caps.ALL.indexOf(Caps.JUMP_STRENGTH);
+		Applied a = assertInstanceOf(Applied.class,
+				RollSelector.random(PlayerStacks.EMPTY, BaseLookup.VANILLA, scripted(jump, 1, 0, 0)));
+		assertSame(Caps.SCALE, a.spec(), "jump DOWN vetoed -> a different attribute");
+		// the same step is fine once gravity is lower, or step height alone climbs a block
+		PlayerStacks lowGravity = PlayerStacks.EMPTY.withSteps(Caps.GRAVITY, -1);
+		assertInstanceOf(Applied.class, RollSelector.fixed(lowGravity, BaseLookup.VANILLA, jumpDown));
+		PlayerStacks highStep = PlayerStacks.EMPTY.withSteps(Caps.STEP_HEIGHT, 2);
+		assertInstanceOf(Applied.class, RollSelector.fixed(highStep, BaseLookup.VANILLA, jumpDown));
+		// ... and step height can't then drop below a block while the jump is too weak
+		PlayerStacks weakJump = highStep.withSteps(Caps.JUMP_STRENGTH, -3);
+		assertInstanceOf(Capped.class,
+				RollSelector.fixed(weakJump, BaseLookup.VANILLA, new Recipe(Caps.STEP_HEIGHT, Direction.DOWN)));
+		assertInstanceOf(Applied.class,
+				RollSelector.fixed(weakJump, BaseLookup.VANILLA, new Recipe(Caps.JUMP_STRENGTH, Direction.DOWN)),
+				"step height 1.0 climbs whatever the jump");
+		assertInstanceOf(Applied.class,
+				RollSelector.fixed(weakJump, BaseLookup.VANILLA, new Recipe(Caps.GRAVITY, Direction.UP)),
+				"step height 1.0 climbs whatever the gravity");
+		assertInstanceOf(Applied.class,
+				RollSelector.fixed(weakJump, BaseLookup.VANILLA, new Recipe(Caps.STEP_HEIGHT, Direction.UP)));
+		// an extra veto is combined with the guard, not instead of it
+		assertInstanceOf(Capped.class, RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, jumpDown, RollVeto.NONE));
+	}
+
+	@Test
 	void stackingSameAttribute() {
 		PlayerStacks stacks = PlayerStacks.EMPTY;
 		for (int i = 1; i <= 3; i++) {
@@ -254,10 +336,14 @@ class RollSelectorTest {
 		// every spec at a point where both directions are legal, so rerolls never bias the draw
 		Map<String, Integer> start = new HashMap<>();
 		for (AttributeSpec spec : Caps.ALL) start.put(spec.key(), spec.minSteps(spec.playerBase()) < 0 ? 0 : 1);
+		// jump DOWN from 100% would drop below a 1.05-block jump (Mobility): start one step up
+		start.put(Caps.JUMP_STRENGTH.key(), 1);
 		PlayerStacks stacks = new PlayerStacks(start, 0);
 		for (AttributeSpec spec : Caps.ALL) {
-			int s = stacks.steps(spec);
-			assertTrue(spec.canStep(spec.playerBase(), s, Direction.UP) && spec.canStep(spec.playerBase(), s, Direction.DOWN), spec.key());
+			for (Direction direction : Direction.values()) {
+				assertInstanceOf(Applied.class, RollSelector.fixed(stacks, BaseLookup.VANILLA, new Recipe(spec, direction)),
+						spec.key() + " " + direction);
+			}
 		}
 		Map<String, Integer> counts = new HashMap<>();
 		int up = 0;
@@ -295,6 +381,7 @@ class RollSelectorTest {
 				double value = spec.valueAt(spec.playerBase(), stacks.steps(spec));
 				assertTrue(spec.inRange(value), spec.key() + " left its range at bite " + i + ": " + value);
 			}
+			assertTrue(Mobility.canClimb(stacks, BaseLookup.VANILLA), "can't climb a ledge after bite " + i + ": " + stacks);
 		}
 		assertEquals(10_000, stacks.bites());
 		assertTrue(Caps.MAX_HEALTH.valueAt(20.0, stacks.steps(Caps.MAX_HEALTH)) >= 2.0);

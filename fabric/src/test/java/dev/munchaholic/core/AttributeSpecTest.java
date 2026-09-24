@@ -113,10 +113,27 @@ class AttributeSpecTest {
 	}
 
 	@Test
+	void zeroOrNegativeBaseNeverStepsAPercentage() {
+		// `/attribute @s minecraft:gravity base set 0` (or negative): a percentage of it can't reach the range
+		for (double base : new double[] {0.0, -0.0, -0.08}) {
+			for (int steps : new int[] {-3, 0, 5}) {
+				assertFalse(Caps.GRAVITY.canStep(base, steps, Direction.UP), "base " + base + " steps " + steps);
+				assertFalse(Caps.GRAVITY.canStep(base, steps, Direction.DOWN), "base " + base + " steps " + steps);
+			}
+			assertEquals(0, Caps.GRAVITY.minSteps(base));
+			assertEquals(0, Caps.GRAVITY.maxSteps(base));
+		}
+		// ADD_VALUE is unaffected: armor and luck have a zero base
+		assertTrue(Caps.ARMOR.canStep(0.0, 0, Direction.UP));
+		assertTrue(Caps.LUCK.canStep(-5.0, 0, Direction.UP));
+		assertTrue(Caps.GRAVITY.canStep(1e-3, 0, Direction.UP), "a tiny positive base still steps (moving back up)");
+	}
+
+	@Test
 	void minMaxStepsTerminateOnDegenerateSpecs() {
-		// base 0 with ADD_MULTIPLIED_BASE: every step keeps the value at 0, which is in range forever
-		AttributeSpec flat = new AttributeSpec("flat", ModifierOp.ADD_MULTIPLIED_BASE, 0.1, -1, 1, 0.0,
-				DisplayUnit.PERCENT_OF_BASE, Direction.UP);
+		// step 0: every step keeps the value at the base, which is in range forever; the walk is bounded
+		AttributeSpec flat = new AttributeSpec("flat", ModifierOp.ADD_VALUE, 0.0, -1, 1, 0.0,
+				DisplayUnit.POINTS, Direction.UP);
 		assertTrue(flat.maxSteps(0.0) > 1000);
 		assertTrue(flat.minSteps(0.0) < -1000);
 		AttributeSpec none = new AttributeSpec("none", ModifierOp.ADD_VALUE, 1.0, 0, 0, 0.0, DisplayUnit.POINTS, Direction.UP);

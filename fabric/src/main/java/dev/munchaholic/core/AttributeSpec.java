@@ -39,8 +39,13 @@ public record AttributeSpec(String key, ModifierOp op, double step, double min, 
 		return value >= min - EPS && value <= max + EPS;
 	}
 
-	/** Whether one step in {@code direction} is allowed (moving back into the range is always allowed). */
+	/**
+	 * Whether one step in {@code direction} is allowed (moving back into the range is always allowed). Never with a
+	 * base {@code <= 0} (or NaN) on {@code ADD_MULTIPLIED_BASE}: a percentage of it can't move the value toward the
+	 * range, so steps would pile up unseen (or push the wrong way) until the base is restored.
+	 */
 	public boolean canStep(double base, int steps, Direction direction) {
+		if (op == ModifierOp.ADD_MULTIPLIED_BASE && !(base > 0.0)) return false;
 		long next = (long) steps + direction.sign();
 		if (next != (int) next) return false;
 		if (inRange(valueAt(base, (int) next))) return true;

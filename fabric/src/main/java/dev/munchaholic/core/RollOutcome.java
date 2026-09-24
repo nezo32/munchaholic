@@ -20,7 +20,7 @@ public sealed interface RollOutcome permits RollOutcome.Applied, RollOutcome.Cap
 		}
 	}
 
-	/** Recipes mode: the food's fixed effect would leave the cap range. Nothing changed. */
+	/** Recipes mode: the food's fixed effect would leave the cap range, or is vetoed ({@link RollVeto}). Nothing changed. */
 	record Capped(AttributeSpec spec, Direction direction, int steps, double base) implements RollOutcome {
 		/** {@code spec.displayDelta(direction.sign())}. */
 		public double displayDelta() {
