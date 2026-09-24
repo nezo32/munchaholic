@@ -35,6 +35,8 @@ public final class AttributeHolders {
 
 	/** Throws IllegalArgumentException for a key that is not in the table. */
 	public static Holder<Attribute> of(AttributeSpec spec) {
-		throw new UnsupportedOperationException("TODO");
+		Holder<Attribute> holder = BY_KEY.get(spec.key());
+		if (holder == null) throw new IllegalArgumentException("Unknown Munchaholic attribute key: " + spec.key());
+		return holder;
 	}
 }

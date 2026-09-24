@@ -1,6 +1,13 @@
 package dev.munchaholic.player;
 
+import java.util.List;
+
+import dev.munchaholic.core.Direction;
+import dev.munchaholic.core.Recipe;
+import dev.munchaholic.core.Recipes;
+import dev.munchaholic.mode.MunchaholicMode;
 import dev.munchaholic.net.RecipesPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -10,15 +17,27 @@ public final class RecipeSync {
 
 	/** active = MunchaholicMode.recipesActive; entries = discoveries sorted, each {@code Recipes.of(seed, food)}. */
 	public static RecipesPayload payloadFor(ServerPlayer player) {
-		throw new UnsupportedOperationException("TODO");
+		MinecraftServer server = player.level().getServer();
+		long seed = server.overworld().getSeed();
+		List<RecipesPayload.Entry> entries = PlayerMunch.discoveries(player).sorted().stream()
+				.map(food -> {
+					Recipe recipe = Recipes.of(seed, food);
+					return new RecipesPayload.Entry(food, recipe.spec().key(), recipe.direction() == Direction.UP);
+				})
+				.toList();
+		return new RecipesPayload(MunchaholicMode.recipesActive(server), entries);
 	}
 
-	/** Only if the client can receive {@link RecipesPayload#TYPE}. */
+	/** Only if the client can receive {@link RecipesPayload#TYPE} (vanilla clients get nothing). */
 	public static void send(ServerPlayer player) {
-		throw new UnsupportedOperationException("TODO");
+		if (ServerPlayNetworking.canSend(player, RecipesPayload.TYPE)) {
+			ServerPlayNetworking.send(player, payloadFor(player));
+		}
 	}
 
 	public static void sendAll(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+			send(player);
+		}
 	}
 }

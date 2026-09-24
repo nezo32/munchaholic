@@ -21,6 +21,10 @@ public record RecipesPayload(boolean active, List<Entry> entries) implements Cus
 			Entry.CODEC.apply(ByteBufCodecs.list()), RecipesPayload::entries,
 			RecipesPayload::new);
 
+	public RecipesPayload {
+		entries = List.copyOf(entries);
+	}
+
 	/** One discovered food: its item id, the attribute key, and whether the value goes up. */
 	public record Entry(String food, String attribute, boolean up) {
 		public static final StreamCodec<ByteBuf, Entry> CODEC = StreamCodec.composite(
