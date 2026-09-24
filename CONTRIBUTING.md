@@ -64,6 +64,9 @@ Run the same checks as CI:
 (cd fabric && ./gradlew build -Pmc=26.2)   # the same against Minecraft 26.2
 ```
 
+If you changed the client (Create World buttons, notification settings, recipe tooltips), also run the client
+GameTests. They need a display, so CI doesn't run them; the command is in [fabric/README.md](fabric/README.md#build-and-test).
+
 If you changed `.github/` or `scripts/`:
 
 ```bash

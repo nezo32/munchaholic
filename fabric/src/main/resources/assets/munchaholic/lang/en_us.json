@@ -44,5 +44,5 @@
   "munchaholic.settings.notifySound": "Roll sound",
   "munchaholic.settings.notifySound.tooltip": "Play a short sound when a bite changes one of your attributes.",
   "munchaholic.settings.notifyMessage": "Roll message",
-  "munchaholic.settings.notifyMessage.tooltip": "Show the actionbar message (✦ food → attribute change) when a bite changes one of your attributes."
+  "munchaholic.settings.notifyMessage.tooltip": "Show the actionbar message (✦ food → attribute change) after every bite."
 }

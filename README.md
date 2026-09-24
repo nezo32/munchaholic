@@ -6,7 +6,7 @@
 
 <p align="center"><em>Take a bite. Roll a stat. Never stop.</em></p>
 
-Munchaholic is a Minecraft mode in which each food you finish eating permanently buffs or debuffs one of your player
+Munchaholic is a Minecraft mod in which each food you finish eating permanently buffs or debuffs one of your player
 attributes: size, gravity, jump, speed, max health, reach and more. The changes keep stacking, up to a safety cap.
 
 It's a Fabric mod for Minecraft Java 26.2–26.3 (in [`fabric/`](fabric/), see [fabric/README.md](fabric/README.md)).
@@ -42,7 +42,7 @@ never changed.
 | Requirements | Fabric Loader 0.19.5+, Fabric API, Java 25. Mod Menu optional |
 | Turning it on | **Munchaholic Mode** ON/OFF button on the Create World → Game tab, right under Difficulty (saved with the world), or `/munchaholic on` |
 | Default | On for new worlds (Create World button); off for worlds made without it, e.g. dedicated servers |
-| Toggling later | `/munchaholic [on\|off\|status]`, operators only (permission level 2, like /gamerule) |
+| Toggling later | `/munchaholic on\|off`, operators only (permission level 2, like /gamerule). `/munchaholic status` works for everyone |
 | Roll Mode | **Roll Mode** button under Munchaholic Mode (**Random** by default, or **Recipes**), or `/munchaholic mode random\|recipes` (operators) |
 | What triggers a roll | Finishing any food, or eating a slice of cake, in Survival or Adventure |
 | What a roll changes | One of 20 vanilla player attributes, one step up or down |
@@ -50,11 +50,12 @@ never changed.
 | On death | Changes are kept. `/munchaholic keep-on-death off` (operators) makes them die with you. Discovered recipes are always kept |
 | Achievements | Unaffected |
 | Languages | English and Russian |
-| Notification settings (per player) | Mod Menu → Munchaholic → config screen, or the client command `/munchaholic-notify <sound\|message\|status> [on\|off]` (needs the mod on the client; saved in `config/munchaholic.json`) |
+| Notification settings (per player) | Mod Menu → Munchaholic → config screen, or the client command `/munchaholic-notify <sound\|message> [on\|off]` / `/munchaholic-notify status` (needs the mod on the client; saved in `config/munchaholic.json`) |
 
 ## Notification settings
 
-Every roll shows an actionbar message and plays a quiet chime: a higher note for a buff, a lower one for a debuff.
+Every roll shows an actionbar message and plays a quiet chime: a higher note for a buff, a lower one for a debuff, and a
+middle one when nothing could change.
 Each player can turn off either one, or both.
 
 With [Mod Menu](https://modrinth.com/mod/modmenu) installed, open Mods → Munchaholic → the config button, and switch
@@ -81,8 +82,8 @@ From then on, the food's tooltip shows its effect, for example `Munchaholic: Spe
 a debuff). Foods you haven't eaten yet show `Munchaholic: ??? (eat it to find out)`. Plain and candle cake are one food.
 Tooltips appear only while the mode is on and set to Recipes, and they need the mod on the client.
 
-In Recipes mode, a food whose effect is at its cap does nothing. The bite still counts, the actionbar says so in gray,
-for example `✦ Carrot → Scale -8% (at the limit: 20%)`, and you can eat other foods to move that attribute back.
+In Recipes mode, a food whose effect is at its cap does nothing. The bite still counts, the actionbar says so with the
+change and the limit in gray, for example `✦ Carrot → Scale -8% (at the limit: 20%)`, and you can eat other foods to move that attribute back.
 
 Switching the Roll Mode keeps every change you already have. Discovered recipes are kept too, and show up again when
 you switch back to Recipes.
@@ -215,9 +216,10 @@ cd fabric
 ./gradlew clean build -Pmc=26.2   # the same against 26.2
 ```
 
-One jar runs on both 26.2 and 26.3. The Create World buttons, the notification settings and the recipe tooltips are
-covered by client GameTests (`./gradlew runClientGameTest`). They need a display (for example Xvfb), so `build` and CI
-don't run them.
+One jar runs on both 26.2 and 26.3. The server GameTests (eating, rolls and caps, death, Recipes mode, the commands,
+the roll feedback) run headless as part of `build`. The Create World buttons, the notification settings and the recipe
+tooltips are covered by client GameTests (`./gradlew runClientGameTest`). They need a display (for example Xvfb), so
+`build` and CI don't run them.
 
 Branch names, PR rules and the full list of local checks are in [CONTRIBUTING.md](CONTRIBUTING.md).
 

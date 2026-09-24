@@ -6,7 +6,8 @@ Branch and PR rules: [CONTRIBUTING.md](../../CONTRIBUTING.md).
 A release is a tag. Pushing `vX.Y.Z` on a commit of `main` starts `.github/workflows/release.yml`, which in one run:
 
 1. `version`: parses the tag and checks that it is on `main`.
-2. `build-mod`: `./gradlew build -Pmod_version=X.Y.Z` in `fabric/` (compile, JUnit tests, server GameTests, jar).
+2. `build-mod`: `./gradlew build -Pmod_version=X.Y.Z` in `fabric/` (compile, JUnit tests, server GameTests, jar). The
+   client GameTests need a display, so they don't run here (see [fabric/README.md](../../fabric/README.md)).
 3. `github-release`: the release "Munchaholic X.Y.Z", with generated notes and two assets:
    `munchaholic-X.Y.Z.jar` and `munchaholic-X.Y.Z-sources.jar`.
 4. `curseforge-mod`: uploads the jar with the sources jar as a child file, using the release notes as the changelog.

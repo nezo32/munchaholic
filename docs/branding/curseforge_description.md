@@ -15,7 +15,7 @@ The text for the Munchaholic project page on CurseForge. It mirrors the
 | Source link | `https://github.com/nezo32/munchaholic` (no Issues, Wiki, Discord or Donate link) |
 | Avatar | `docs/branding/curseforge_logo.png` |
 | Environment | Client & Server |
-| Files | Uploaded by `release.yml`: `munchaholic-X.Y.Z.jar`, game versions `26.2, 26.3, Fabric, Java 25, Client, Server` |
+| Files | Uploaded by `release.yml`: `munchaholic-X.Y.Z.jar` (plus `munchaholic-X.Y.Z-sources.jar` as an additional file), game versions `26.2, 26.3, Fabric, Java 25, Client, Server` |
 
 ## Description
 
@@ -37,7 +37,7 @@ The mode is a **Munchaholic Mode** button on the Create World screen, right belo
 - 📈 **It stacks, for good:** every roll moves an attribute one step, and the steps add up bite after bite. Changes stay when you log out and, by default, when you die.
 - 🛡️ **Safety caps:** every attribute has a limit (table below), so you can't shrink to nothing, lose your last heart or float away for good.
 - 📖 **Two Roll Modes:** *Random* rolls any attribute with every bite. *Recipes* gives each food one fixed effect per world: eat it to discover what it does, and its tooltip shows it from then on.
-- 🌍 **Per-world settings:** saved inside the world. Operators can switch them later with `/munchaholic on|off|status`, `/munchaholic mode random|recipes` and `/munchaholic keep-on-death on|off`.
+- 🌍 **Per-world settings:** saved inside the world. Operators can switch them later with `/munchaholic on|off`, `/munchaholic mode random|recipes` and `/munchaholic keep-on-death on|off`, and anyone can check them with `/munchaholic status`.
 - 📊 **Check your build:** `/munchaholic stats` lists your bites, discovered recipes and every changed attribute. Operators can undo it all with `/munchaholic reset`.
 - 🔕 **Notification settings:** every roll shows a short actionbar message with a soft chime. Turn the sound, the message or both off from Mod Menu or with `/munchaholic-notify`.
 - 🧑‍🤝‍🧑 **Multiplayer ready:** works on dedicated servers, with notification settings per player. In English and Russian.
@@ -76,7 +76,7 @@ Percentages are relative to normal (100%). Caps count only your base value plus 
 - Fabric Loader 0.19.5+ and Fabric API
 - Java 25
 - Mod Menu is optional (notification settings screen)
-- Install on both the server and the clients
+- Install on the server and on the clients (a server-only install works too, without notification settings and recipe tooltips)
 
 ## More from the -aholic series
 

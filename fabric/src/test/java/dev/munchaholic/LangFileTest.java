@@ -295,6 +295,8 @@ class LangFileTest {
 	void dynamicKeysPresent() {
 		for (RollMode mode : RollMode.values()) {
 			assertTrue(lang.containsKey(mode.translationKey()), "missing " + mode.translationKey());
+			// Texts.rollMode builds this key at run time, so the scanner can't see its fallback
+			assertEquals(lang.get(mode.translationKey()), Texts.englishRollMode(mode), "fallback of " + mode.translationKey());
 			assertTrue(lang.containsKey("munchaholic.createWorld.rollMode.tooltip." + mode.id()), "missing roll mode tooltip for " + mode.id());
 		}
 		for (Direction direction : Direction.values()) {
