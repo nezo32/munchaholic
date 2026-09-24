@@ -3,13 +3,12 @@ package dev.munchaholic;
 import dev.munchaholic.core.AttributeSpec;
 import dev.munchaholic.core.RollOutcome;
 import dev.munchaholic.net.RolledPayload;
-
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundEntityPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -89,13 +88,13 @@ public final class Feedback {
 		int tone = tone(outcome);
 		if (modded) {
 			// the client decides message/sound from its own config
-			player.connection.send(ServerPlayNetworking.createClientboundPacket(new RolledPayload(msg, tone)));
+			ServerPlayNetworking.send(player, new RolledPayload(msg, tone));
 			return;
 		}
 		player.sendOverlayMessage(msg);
-		player.connection.send(new ClientboundSoundPacket(
+		// attached to the player, not to a position: chorus fruit teleports right after the eat hook runs
+		player.connection.send(new ClientboundSoundEntityPacket(
 				BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SOUND),
-				SoundSource.PLAYERS, player.getX(), player.getY(), player.getZ(),
-				VOLUME, pitch(tone), player.getRandom().nextLong()));
+				SoundSource.PLAYERS, player, VOLUME, pitch(tone), player.getRandom().nextLong()));
 	}
 }

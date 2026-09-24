@@ -5,7 +5,6 @@ import dev.munchaholic.core.Direction;
 import dev.munchaholic.core.DisplayUnit;
 import dev.munchaholic.core.Numbers;
 import dev.munchaholic.core.RollMode;
-
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -13,6 +12,7 @@ import net.minecraft.network.chat.MutableComponent;
 /**
  * Component builders shared by Feedback, the commands and the client tooltip. Server-safe (common source set).
  * Server-sent text carries its English fallback for vanilla clients; vanilla {@code attribute.name.*} keys don't need one.
+ * Keys and fallbacks are written out as literals so LangFileTest checks them against en_us.
  */
 public final class Texts {
 	private Texts() {}
@@ -22,13 +22,16 @@ public final class Texts {
 		return Component.translatable(spec.translationKey()).withStyle(ChatFormatting.WHITE);
 	}
 
-	/** A number in the spec's unit ({@code 92%}, {@code +2}). Unstyled. */
+	/** A number in the spec's unit ({@code 92%}, {@code +2}). Unstyled. Same key and fallback as {@link DisplayUnit}. */
 	public static MutableComponent amount(AttributeSpec spec, double displayValue, boolean signed) {
 		DisplayUnit unit = spec.unit();
 		String number = signed
 				? Numbers.signed(displayValue, unit.maxDecimals())
 				: Numbers.format(displayValue, unit.maxDecimals());
-		return Component.translatableWithFallback(unit.translationKey(), unit.fallback(), number);
+		return switch (unit) {
+			case PERCENT_OF_BASE, PERCENT_POINTS -> Component.translatableWithFallback("munchaholic.unit.percent", "%s%%", number);
+			case POINTS -> Component.translatableWithFallback("munchaholic.unit.points", "%s", number);
+		};
 	}
 
 	/** A signed change of {@code stepsDelta} steps; green if it is a buff, else red. */
@@ -45,7 +48,11 @@ public final class Texts {
 
 	/** The roll mode name, gold. */
 	public static MutableComponent rollMode(RollMode mode) {
-		return Component.translatableWithFallback(mode.translationKey(), englishRollMode(mode)).withStyle(ChatFormatting.GOLD);
+		MutableComponent name = switch (mode) {
+			case RANDOM -> Component.translatableWithFallback("munchaholic.rollMode.random", "Random");
+			case RECIPES -> Component.translatableWithFallback("munchaholic.rollMode.recipes", "Recipes");
+		};
+		return name.withStyle(ChatFormatting.GOLD);
 	}
 
 	/** {@code "Random"} / {@code "Recipes"}: the en_us value of {@link RollMode#translationKey()}. */

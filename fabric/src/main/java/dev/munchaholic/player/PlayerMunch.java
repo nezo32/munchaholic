@@ -1,5 +1,8 @@
 package dev.munchaholic.player;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import dev.munchaholic.Munchaholic;
 import dev.munchaholic.core.AttributeSpec;
 import dev.munchaholic.core.BaseLookup;
@@ -10,6 +13,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.phys.AABB;
 
 /**
  * A player's Munchaholic state and its attribute modifiers. The integer steps in {@link MunchAttachments#STACKS}
@@ -50,6 +54,55 @@ public final class PlayerMunch {
 		Discoveries known = discoveries(player);
 		if (known.has(foodId)) return false;
 		player.setAttached(MunchAttachments.DISCOVERIES, known.with(foodId));
+		return true;
+	}
+
+	/**
+	 * Whether the player would still fit where they stand with {@code scaleSteps} of our scale modifier. Players are
+	 * never moved out of blocks when they grow ({@code Entity.refreshDimensions} skips the fudge for players), so a
+	 * growth that doesn't fit would suffocate them. Checks the grown box of the current pose the way vanilla checks a
+	 * pose change ({@code Player.canPlayerFitWithinBlocksAndEntitiesWhen}). Shrinking or staying the same always fits.
+	 */
+	public static boolean fitsWithScaleSteps(ServerPlayer player, int scaleSteps) {
+		AttributeInstance instance = player.getAttribute(AttributeHolders.of(Caps.SCALE));
+		if (instance == null) return true;
+		// the exact new total, other mods' scale modifiers included
+		AttributeInstance probe = new AttributeInstance(instance.getAttribute(), changed -> {});
+		probe.replaceFrom(instance);
+		probe.removeModifier(MODIFIER_ID);
+		if (scaleSteps != 0) {
+			probe.addTransientModifier(new AttributeModifier(MODIFIER_ID, Caps.SCALE.modifierAmount(scaleSteps), op(Caps.SCALE)));
+		}
+		double now = instance.getValue();
+		double next = probe.getValue();
+		if (!(next > now) || !(now > 0.0)) return true;
+		AABB grown = player.getDimensions(player.getPose()).scale((float) (next / now))
+				.makeBoundingBox(player.position()).deflate(1.0E-7);
+		return player.level().noCollision(player, grown);
+	}
+
+	/**
+	 * A player without a stacks attachment who still carries {@code munchaholic:bites} modifiers (the attachment was
+	 * lost or failed to decode; vanilla restored the modifiers) gets the steps rebuilt from the modifier amounts
+	 * ({@code round(amount / step)}), so the next {@link #applyModifiers} keeps their changes instead of wiping them.
+	 * The bite counter can't be recovered and restarts at 0. Returns whether anything was rebuilt.
+	 */
+	public static boolean rebuildLostStacks(ServerPlayer player) {
+		if (player.hasAttached(MunchAttachments.STACKS)) return false;
+		Map<String, Integer> steps = new HashMap<>();
+		for (AttributeSpec spec : Caps.ALL) {
+			AttributeInstance instance = player.getAttribute(AttributeHolders.of(spec));
+			AttributeModifier modifier = instance == null ? null : instance.getModifier(MODIFIER_ID);
+			if (modifier == null) continue;
+			double exact = modifier.amount() / spec.step();
+			if (!(Math.abs(exact) < Integer.MAX_VALUE)) continue; // NaN, infinite or absurd: let applyModifiers drop it
+			int s = (int) Math.round(exact);
+			if (s != 0) steps.put(spec.key(), s);
+		}
+		if (steps.isEmpty()) return false;
+		player.setAttached(MunchAttachments.STACKS, new PlayerStacks(steps, 0));
+		Munchaholic.LOGGER.warn("Munchaholic data of {} was missing; rebuilt their attribute changes from the modifiers: {}",
+				player.getName().getString(), steps);
 		return true;
 	}
 

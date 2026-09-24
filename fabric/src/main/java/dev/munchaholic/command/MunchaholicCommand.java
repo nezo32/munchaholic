@@ -3,8 +3,10 @@ package dev.munchaholic.command;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Predicate;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.munchaholic.Texts;
 import dev.munchaholic.core.AttributeSpec;
 import dev.munchaholic.core.BaseLookup;
@@ -27,6 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class MunchaholicCommand {
 	public static final String ROOT = "munchaholic";
+	private static final Predicate<CommandSourceStack> GAMEMASTER = Commands.hasPermission(Commands.LEVEL_GAMEMASTERS);
 
 	private MunchaholicCommand() {}
 
@@ -53,8 +56,7 @@ public final class MunchaholicCommand {
 				.then(Commands.literal("stats")
 						.executes(c -> stats(c.getSource(), c.getSource().getPlayerOrException()))
 						.then(Commands.argument("player", EntityArgument.player())
-								.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-								.executes(c -> stats(c.getSource(), EntityArgument.getPlayer(c, "player")))))
+								.executes(c -> statsOf(c.getSource(), EntityArgument.getPlayer(c, "player")))))
 				.then(Commands.literal("reset").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
 						.then(Commands.argument("targets", EntityArgument.players())
 								.executes(c -> reset(c.getSource(), EntityArgument.getPlayers(c, "targets")))
@@ -113,6 +115,16 @@ public final class MunchaholicCommand {
 		return value ? 1 : 0;
 	}
 
+	/**
+	 * {@code stats <player>}: anyone may name themselves; another player's build needs gamemaster (D16). The check is
+	 * here, not in {@code requires}, because it depends on the argument. A refused non-op gets the same error as for
+	 * a player who isn't online, so it doesn't reveal anything.
+	 */
+	private static int statsOf(CommandSourceStack source, ServerPlayer target) throws CommandSyntaxException {
+		if (target != source.getPlayer() && !GAMEMASTER.test(source)) throw EntityArgument.NO_PLAYERS_FOUND.create();
+		return stats(source, target);
+	}
+
 	/** Header plus one line per changed attribute (Caps.ALL order), or a single "none" line. Returns the line count. */
 	private static int stats(CommandSourceStack source, ServerPlayer player) {
 		PlayerStacks stacks = PlayerMunch.stacks(player);
@@ -143,8 +155,11 @@ public final class MunchaholicCommand {
 	private static int reset(CommandSourceStack source, Collection<ServerPlayer> targets) {
 		for (ServerPlayer player : targets) {
 			PlayerMunch.reset(player);
-			player.sendSystemMessage(Component.translatableWithFallback("munchaholic.message.reset",
-					"Your Munchaholic attribute changes were reset"));
+			// resetting yourself: the command feedback below is enough (one line, like vanilla /gamemode)
+			if (player != source.getPlayer()) {
+				player.sendSystemMessage(Component.translatableWithFallback("munchaholic.message.reset",
+						"Your Munchaholic attribute changes were reset"));
+			}
 		}
 		if (targets.size() == 1) {
 			Component name = targets.iterator().next().getDisplayName();
@@ -162,8 +177,10 @@ public final class MunchaholicCommand {
 	private static int resetRecipes(CommandSourceStack source, Collection<ServerPlayer> targets) {
 		for (ServerPlayer player : targets) {
 			PlayerMunch.forgetRecipes(player);
-			player.sendSystemMessage(Component.translatableWithFallback("munchaholic.message.recipesReset",
-					"Your discovered Munchaholic recipes were forgotten"));
+			if (player != source.getPlayer()) {
+				player.sendSystemMessage(Component.translatableWithFallback("munchaholic.message.recipesReset",
+						"Your discovered Munchaholic recipes were forgotten"));
+			}
 		}
 		if (targets.size() == 1) {
 			Component name = targets.iterator().next().getDisplayName();
