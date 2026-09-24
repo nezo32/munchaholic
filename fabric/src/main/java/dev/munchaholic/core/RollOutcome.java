@@ -6,17 +6,17 @@ public sealed interface RollOutcome permits RollOutcome.Applied, RollOutcome.Cap
 	record Applied(AttributeSpec spec, Direction direction, int oldSteps, int newSteps, double base) implements RollOutcome {
 		/** {@code spec.isBuff(direction)}. */
 		public boolean isBuff() {
-			throw new UnsupportedOperationException("TODO");
+			return spec.isBuff(direction);
 		}
 
 		/** {@code spec.displayDelta(newSteps - oldSteps)}. */
 		public double displayDelta() {
-			throw new UnsupportedOperationException("TODO");
+			return spec.displayDelta(newSteps - oldSteps);
 		}
 
 		/** {@code spec.displayValue(base, newSteps)}. */
 		public double displayNow() {
-			throw new UnsupportedOperationException("TODO");
+			return spec.displayValue(base, newSteps);
 		}
 	}
 
@@ -24,12 +24,12 @@ public sealed interface RollOutcome permits RollOutcome.Applied, RollOutcome.Cap
 	record Capped(AttributeSpec spec, Direction direction, int steps, double base) implements RollOutcome {
 		/** {@code spec.displayDelta(direction.sign())}. */
 		public double displayDelta() {
-			throw new UnsupportedOperationException("TODO");
+			return spec.displayDelta(direction.sign());
 		}
 
 		/** {@code spec.displayValue(base, steps)}. */
 		public double displayNow() {
-			throw new UnsupportedOperationException("TODO");
+			return spec.displayValue(base, steps);
 		}
 	}
 

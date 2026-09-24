@@ -17,6 +17,6 @@ public enum Direction {
 	}
 
 	public Direction opposite() {
-		throw new UnsupportedOperationException("TODO");
+		return this == UP ? DOWN : UP;
 	}
 }

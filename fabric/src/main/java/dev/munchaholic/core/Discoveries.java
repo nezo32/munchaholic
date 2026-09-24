@@ -1,5 +1,6 @@
 package dev.munchaholic.core;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -12,19 +13,22 @@ public record Discoveries(Set<String> foods) {
 	}
 
 	public boolean has(String foodId) {
-		throw new UnsupportedOperationException("TODO");
+		return foodId != null && foods.contains(foodId);
 	}
 
 	public Discoveries with(String foodId) {
-		throw new UnsupportedOperationException("TODO");
+		if (has(foodId)) return this;
+		Set<String> next = new HashSet<>(foods);
+		next.add(foodId);
+		return new Discoveries(next);
 	}
 
 	public int size() {
-		throw new UnsupportedOperationException("TODO");
+		return foods.size();
 	}
 
 	/** Natural order, for NBT and payloads. */
 	public List<String> sorted() {
-		throw new UnsupportedOperationException("TODO");
+		return foods.stream().sorted().toList();
 	}
 }
