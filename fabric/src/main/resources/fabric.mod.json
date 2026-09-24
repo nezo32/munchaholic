@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "munchaholic",
+	"version": "${version}",
+	"name": "Munchaholic",
+	"description": "Take a bite. Roll a stat. Never stop. Every time you finish eating, one random attribute (size, jump, speed, max health, gravity, reach…) is permanently buffed or debuffed, and the changes stack.",
+	"authors": ["nezo"],
+	"contact": {
+		"homepage": "https://github.com/nezo32/munchaholic",
+		"sources": "https://github.com/nezo32/munchaholic",
+		"issues": "https://github.com/nezo32/munchaholic/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/munchaholic/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["dev.munchaholic.Munchaholic"],
+		"client": ["dev.munchaholic.client.MunchaholicClient"],
+		"modmenu": ["dev.munchaholic.client.ModMenuIntegration"]
+	},
+	"mixins": [
+		"munchaholic.mixins.json",
+		{ "config": "munchaholic.client.mixins.json", "environment": "client" }
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"fabric-api": "*",
+		"minecraft": ">=26.2 <26.4-",
+		"java": ">=25"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

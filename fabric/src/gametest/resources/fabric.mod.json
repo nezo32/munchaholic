@@ -1,0 +1,14 @@
+{
+	"schemaVersion": 1,
+	"id": "munchaholic-gametest",
+	"version": "1.0.0",
+	"name": "Munchaholic GameTests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [],
+		"fabric-client-gametest": []
+	},
+	"depends": {
+		"munchaholic": "*"
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "dev.munchaholic.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"CakeBlockMixin",
+		"FoodPropertiesMixin",
+		"LevelStorageAccessMixin",
+		"MinecraftServerAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
