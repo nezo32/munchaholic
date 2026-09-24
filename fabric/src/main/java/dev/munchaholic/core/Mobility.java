@@ -7,8 +7,12 @@ package dev.munchaholic.core;
  * vetoed when the result could not climb.
  */
 public final class Mobility {
-	/** Jump height (blocks) that counts as "can get up a ledge": one block plus room for a carpet or snow layer. */
-	public static final double CLIMB_JUMP_HEIGHT = 1.05;
+	/**
+	 * Jump height (blocks) that counts as "can get up a ledge": one block plus a small margin. Low enough that a 90% jump
+	 * (1.047 blocks) at normal gravity still passes, so jump debuffs stay possible; the limits at the vanilla bases are
+	 * jump 90% (at 100% gravity) and gravity 130% (at 100% jump).
+	 */
+	public static final double CLIMB_JUMP_HEIGHT = 1.02;
 	/** A step height at or above one block walks up a ledge without jumping. */
 	public static final double CLIMB_STEP_HEIGHT = 1.0;
 	/** {@code LivingEntity.travelInAir}: vertical velocity is multiplied by this float drag after gravity. */

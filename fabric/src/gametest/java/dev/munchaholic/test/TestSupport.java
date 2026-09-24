@@ -11,6 +11,8 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.munchaholic.core.AttributeSpec;
 import dev.munchaholic.core.Caps;
 import dev.munchaholic.core.RandomIndex;
+import dev.munchaholic.core.Recipe;
+import dev.munchaholic.core.Recipes;
 import dev.munchaholic.core.RollMode;
 import dev.munchaholic.mode.MunchaholicMode;
 import dev.munchaholic.player.AttributeHolders;
@@ -18,6 +20,7 @@ import dev.munchaholic.player.PlayerMunch;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
@@ -46,6 +49,8 @@ public final class TestSupport {
 	public static final BlockPos CAKE_POS = new BlockPos(1, 2, 1);
 	/** Tolerance for comparing attribute values computed in doubles. */
 	public static final double EPS = 1e-6;
+	/** Where mock players start: open air far above the test structures. */
+	public static final double OPEN_AIR_X = 0.5, OPEN_AIR_Y = 200.0, OPEN_AIR_Z = 0.5;
 
 	private TestSupport() {}
 
@@ -136,6 +141,20 @@ public final class TestSupport {
 			if (next >= bound) throw new AssertionError("scripted draw " + next + " >= bound " + bound);
 			return next;
 		};
+	}
+
+	/**
+	 * An item whose recipe in this world is {@code wanted}. Searches every item, not only foods: {@code BiteHandler.bite}
+	 * keys the recipe by item id alone, and with ~1500 ids a match exists for any seed (each has a 1 in 40 chance).
+	 */
+	public static ItemStack itemWithRecipe(GameTestHelper h, Recipe wanted) {
+		long seed = server(h).overworld().getSeed();
+		for (Item item : BuiltInRegistries.ITEM) {
+			ItemStack stack = new ItemStack(item);
+			if (stack.isEmpty()) continue;
+			if (Recipes.of(seed, BuiltInRegistries.ITEM.getKey(item).toString()).equals(wanted)) return stack;
+		}
+		throw new AssertionError("no item has the recipe " + wanted + " in this world");
 	}
 
 	/** A {@link RandomIndex} that must never be used (Recipes mode is deterministic). */
@@ -235,7 +254,12 @@ public final class TestSupport {
 		return mockPlayer(h, "munch-mock-player");
 	}
 
-	private static Mock mockPlayer(GameTestHelper h, String name) {
+	/** A mock player with a unique name (at most 16 characters), for commands that take a player name. */
+	public static Mock namedMockPlayer(GameTestHelper h) {
+		return mockPlayer(h, "munch" + UUID.randomUUID().toString().replace("-", "").substring(0, 11));
+	}
+
+	public static Mock mockPlayer(GameTestHelper h, String name) {
 		ServerLevel level = h.getLevel();
 		CommonListenerCookie cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), name), false);
 		ServerPlayer p = new ServerPlayer(level.getServer(), level, cookie.gameProfile(), cookie.clientInformation());
@@ -243,6 +267,10 @@ public final class TestSupport {
 		EmbeddedChannel channel = new EmbeddedChannel(connection);
 		level.getServer().getPlayerList().placeNewPlayer(connection, p, cookie);
 		p.setGameMode(GameType.SURVIVAL);
+		// in open air: placeNewPlayer puts the player at (0, 0, 0), inside the ground, where the growth check refuses
+		// every scale UP; no gravity keeps them from falling during multi-tick tests
+		p.setNoGravity(true);
+		p.snapTo(OPEN_AIR_X, OPEN_AIR_Y, OPEN_AIR_Z, 0.0F, 0.0F);
 		p.getInventory().clearContent();
 		Mock mock = new Mock(p, channel);
 		mock.drain();

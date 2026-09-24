@@ -123,7 +123,14 @@ top of the cap. When a step would pass a cap, Random mode rolls a different attr
 and Recipes mode does nothing and shows the "at the limit" message.
 
 The caps keep every player playable: you never shrink below 20% or lose your last heart, gravity never reaches zero,
-and you can always reach at least 1.2 blocks.
+and you can always reach at least 1.2 blocks. Two more checks look at your situation, not a single attribute:
+
+- **You can always climb a 1-block ledge.** Jump Strength, Gravity and Step Height are checked together, and a roll
+  that would leave you unable to jump or step up one block is treated like a capped one. At normal gravity your jump
+  goes down to 90%, and with a normal jump gravity goes up to 130%. Lower gravity or a stronger jump leaves more room,
+  and with a Step Height of 1 or more you walk up blocks anyway.
+- **You never grow into a wall.** A Scale increase that wouldn't fit where you're standing is treated like a capped
+  one too.
 
 **Fair play:** Creative and Spectator players never roll. Fake players from other mods (auto-feeders and similar) never
 roll either. Every change is one vanilla attribute modifier, `munchaholic:bites`, which you can inspect with
@@ -175,10 +182,17 @@ Munchaholic only changes vanilla player attributes. What those attributes do is 
 
 - A big player doesn't fit through doors, 1-block tunnels or under low ceilings, and can take suffocation damage when
   their head ends up inside a block. A tiny player fits through gaps a normal player can't.
+- **Growing indoors.** A roll never makes you bigger than the space you're standing in: if the larger size wouldn't
+  fit, the roll picks a different attribute (Random) or shows "at the limit" (Recipes). Your size isn't re-checked
+  later, though. If you grew large outdoors and respawn at a bed in a small room (with keep-on-death on), you respawn
+  at that size and can take suffocation damage. Keep your bed somewhere roomy, eat a food that shrinks you, or ask an
+  operator for `/munchaholic reset <player>`.
 - With Step Height above 1, you walk up full blocks without jumping. Above 1.5, you step right over fences and walls,
   so fenced pens no longer hold you.
 - High Jump Strength can throw you high enough to take fall damage on landing, unless Safe Fall Distance or Fall
   Damage Multiplier make up for it. Low Gravity makes every jump float.
+- Rolls never take away your ability to climb a 1-block ledge: Jump Strength, Gravity and Step Height are checked
+  together, so a jump debuff or extra gravity can show "at the limit" (or roll something else) long before its own cap.
 - Low Block Interaction Range means standing right next to a block to break or place it. High Entity Interaction Range
   lets you hit mobs from across a room.
 - Losing Max Health removes the hearts at once. Gaining it doesn't heal: the new hearts start empty.
@@ -195,6 +209,8 @@ Munchaholic only changes vanilla player attributes. What those attributes do is 
 - Dedicated servers, and worlds made without the Create World button, start with the mode OFF until an operator runs
   `/munchaholic on`.
 - Recipes come from the world seed, so two worlds with the same seed have the same recipes.
+- Only items with a food component and slices of cake blocks count. Blocks that feed you some other way (for example
+  some modded pies) don't roll.
 
 ## Repository layout
 

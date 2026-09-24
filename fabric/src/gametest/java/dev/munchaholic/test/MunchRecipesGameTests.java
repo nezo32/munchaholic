@@ -36,6 +36,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -200,6 +201,33 @@ public class MunchRecipesGameTests {
 			h.assertTrue(payload.active(), "active");
 			List<RecipesPayload.Entry> expected = List.of(entry(h, "minecraft:apple"), entry(h, "minecraft:carrot"));
 			h.assertValueEqual(payload.entries(), expected, "entries");
+		} finally {
+			defaults(h);
+		}
+		h.succeed();
+	}
+
+	/**
+	 * After a death the recipe list sent to the client (AFTER_RESPAWN) is built from the new player entity: it still
+	 * holds the discovered foods, whether or not attribute changes are kept on death.
+	 */
+	@GameTest
+	public void discoveriesSyncedAfterRespawn(GameTestHelper h) {
+		recipes(h);
+		try {
+			for (boolean keep : new boolean[] {true, false}) {
+				MunchaholicMode.setKeepOnDeath(server(h), keep);
+				ServerPlayer p = survivalPlayer(h);
+				eat(h, p, Items.CARROT);
+				h.assertTrue(PlayerMunch.discoveries(p).has("minecraft:carrot"), "discovered before death, keep=" + keep);
+				p.kill(h.getLevel());
+				ServerPlayer np = server(h).getPlayerList().respawn(p, false, Entity.RemovalReason.KILLED);
+				h.assertTrue(np != p, "respawn made a new player entity");
+				RecipesPayload payload = RecipeSync.payloadFor(np);
+				h.assertTrue(payload.active(), "active after respawn, keep=" + keep);
+				h.assertTrue(payload.entries().contains(entry(h, "minecraft:carrot")),
+						"carrot in the synced list after respawn, keep=" + keep + ": " + payload.entries());
+			}
 		} finally {
 			defaults(h);
 		}

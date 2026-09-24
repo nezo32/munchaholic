@@ -23,7 +23,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -73,10 +73,10 @@ public class MunchNotifyGameTests {
 			List<ClientboundSystemChatPacket> overlays = TestSupport.Mock.overlays(out);
 			h.assertValueEqual(overlays.size(), 1, "overlay packets for " + o + "; outbound=" + out);
 			h.assertValueEqual(overlays.get(0).content(), expected, "overlay content");
-			List<ClientboundSoundPacket> sounds = out.stream().filter(m -> m instanceof ClientboundSoundPacket)
-					.map(m -> (ClientboundSoundPacket) m).toList();
+			List<ClientboundSoundEntityPacket> sounds = out.stream().filter(m -> m instanceof ClientboundSoundEntityPacket)
+					.map(m -> (ClientboundSoundEntityPacket) m).toList();
 			h.assertValueEqual(sounds.size(), 1, "sound packets; outbound=" + out);
-			ClientboundSoundPacket sound = sounds.get(0);
+			ClientboundSoundEntityPacket sound = sounds.get(0);
 			float pitch = o == GRAVITY_DOWN ? Feedback.PITCH_BUFF : o == SCALE_DOWN ? Feedback.PITCH_DEBUFF : Feedback.PITCH_NEUTRAL;
 			h.assertTrue(Math.abs(sound.getPitch() - pitch) < 1e-4, "pitch " + sound.getPitch() + " for " + o);
 			h.assertTrue(Math.abs(sound.getVolume() - Feedback.VOLUME) < 1e-4, "volume " + sound.getVolume());
@@ -96,7 +96,7 @@ public class MunchNotifyGameTests {
 		h.assertValueEqual(payloads.get(0).message(), Feedback.message(bread(), SCALE_DOWN), "payload message");
 		h.assertValueEqual(payloads.get(0).tone(), Feedback.TONE_DEBUFF, "payload tone");
 		h.assertTrue(TestSupport.Mock.overlays(out).isEmpty(), "no overlay packet; outbound=" + out);
-		h.assertTrue(out.stream().noneMatch(m -> m instanceof ClientboundSoundPacket), "no sound packet; outbound=" + out);
+		h.assertTrue(out.stream().noneMatch(m -> m instanceof ClientboundSoundEntityPacket), "no sound packet; outbound=" + out);
 		h.succeed();
 	}
 
@@ -110,7 +110,7 @@ public class MunchNotifyGameTests {
 		List<ClientboundSystemChatPacket> overlays = TestSupport.Mock.overlays(out);
 		h.assertValueEqual(overlays.size(), 1, "overlays; outbound=" + out);
 		h.assertValueEqual(key(overlays.get(0).content()), "munchaholic.message.rolled", "rolled key");
-		long chimes = out.stream().filter(m -> m instanceof ClientboundSoundPacket s && s.getSound().value() == Feedback.SOUND).count();
+		long chimes = out.stream().filter(m -> m instanceof ClientboundSoundEntityPacket s && s.getSound().value() == Feedback.SOUND).count();
 		h.assertValueEqual(chimes, 1L, "chime packets");
 		h.assertTrue(TestSupport.Mock.payloads(out, RecipesPayload.class).isEmpty(), "no recipes payload in Random mode");
 		h.succeed();

@@ -79,10 +79,15 @@ class MobilityTest {
 	@Test
 	void canClimb() {
 		assertTrue(Mobility.canClimb(PlayerStacks.EMPTY, BaseLookup.VANILLA), "vanilla player");
-		assertFalse(Mobility.canClimb(stacks(-1, 0, 0), BaseLookup.VANILLA), "90% jump: 1.047 < 1.05");
+		assertEquals(1.02, Mobility.CLIMB_JUMP_HEIGHT);
+		assertTrue(Mobility.canClimb(stacks(-1, 0, 0), BaseLookup.VANILLA), "90% jump: 1.047 >= 1.02");
+		assertFalse(Mobility.canClimb(stacks(-2, 0, 0), BaseLookup.VANILLA), "80% jump: 0.846");
+		assertFalse(Mobility.canClimb(stacks(-2, -2, 0), BaseLookup.VANILLA), "80% jump, 80% gravity: 1.002");
+		assertTrue(Mobility.canClimb(stacks(-2, -3, 0), BaseLookup.VANILLA), "80% jump, 70% gravity: 1.116");
 		assertTrue(Mobility.canClimb(stacks(-1, -1, 0), BaseLookup.VANILLA), "90% jump, 90% gravity");
-		assertFalse(Mobility.canClimb(stacks(0, 3, 0), BaseLookup.VANILLA), "130% gravity: 1.027");
-		assertTrue(Mobility.canClimb(stacks(0, 2, 0), BaseLookup.VANILLA), "120% gravity: 1.095");
+		assertFalse(Mobility.canClimb(stacks(-1, 1, 0), BaseLookup.VANILLA), "90% jump, 110% gravity: 0.971");
+		assertTrue(Mobility.canClimb(stacks(0, 3, 0), BaseLookup.VANILLA), "130% gravity: 1.027");
+		assertFalse(Mobility.canClimb(stacks(0, 4, 0), BaseLookup.VANILLA), "140% gravity: 0.980");
 		assertTrue(Mobility.canClimb(stacks(-5, 20, 2), BaseLookup.VANILLA), "step height 1.0 alone");
 		assertFalse(Mobility.canClimb(stacks(-5, 20, 1), BaseLookup.VANILLA));
 		assertTrue(Mobility.canClimb(0.0, GRAVITY, 1.0));

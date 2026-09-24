@@ -38,7 +38,9 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
 import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.storage.SavedDataStorage;
 
@@ -223,6 +225,45 @@ public class MunchModeGameTests {
 		h.assertValueEqual(emptyChats.size(), 1, "only the 'none' line");
 		h.assertTrue(containsKey(emptyChats.get(0).content(), "munchaholic.command.stats.none"), "none line");
 		assertFails(h, server(h).createCommandSourceStack(), "munchaholic stats", "console (no player)");
+		h.succeed();
+	}
+
+	/** A non-op may name themselves in stats (names are resolved without selector permission); naming anyone else fails. */
+	@GameTest
+	public void nonOpStatsByName(GameTestHelper h) throws CommandSyntaxException {
+		defaults(h);
+		TestSupport.Mock self = TestSupport.namedMockPlayer(h);
+		TestSupport.Mock other = TestSupport.namedMockPlayer(h);
+		ServerPlayer p = self.player();
+		PlayerMunch.setStacks(p, PlayerStacks.EMPTY.withSteps(Caps.LUCK, 2).withSteps(Caps.ARMOR, 1));
+		PlayerMunch.setStacks(other.player(), PlayerStacks.EMPTY.withSteps(Caps.LUCK, 5));
+		CommandSourceStack source = p.createCommandSourceStack();
+		h.assertTrue(!source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER),
+				"the mock player is not an op");
+		self.drain();
+		h.assertValueEqual(run(h, source, "munchaholic stats " + p.getGameProfile().name()), 2, "stats <own name>");
+		var chats = TestSupport.Mock.chats(self.drain());
+		h.assertValueEqual(chats.size(), 3, "header + 2 lines");
+		h.assertTrue(containsKey(chats.get(0).content(), "munchaholic.command.stats.header"), "header");
+		assertFails(h, source, "munchaholic stats " + other.player().getGameProfile().name(), "non-op (other player)");
+		h.assertTrue(TestSupport.Mock.chats(self.drain()).isEmpty(), "nothing about the other player was sent");
+		h.succeed();
+	}
+
+	/** An op resetting themselves gets the command feedback only: one line, no separate "your changes were reset". */
+	@GameTest
+	public void opResetSelfOneLine(GameTestHelper h) throws CommandSyntaxException {
+		defaults(h);
+		TestSupport.Mock mock = mockPlayer(h);
+		ServerPlayer p = mock.player();
+		PlayerMunch.setStacks(p, PlayerStacks.EMPTY.withSteps(Caps.ARMOR, 2));
+		mock.drain();
+		CommandSourceStack source = p.createCommandSourceStack().withPermission(LevelBasedPermissionSet.GAMEMASTER);
+		h.assertValueEqual(run(h, source, "munchaholic reset @s"), 1, "reset @s");
+		h.assertTrue(PlayerMunch.stacks(p).isEmpty(), "reset");
+		var chats = TestSupport.Mock.chats(mock.drain());
+		h.assertValueEqual(chats.size(), 1, "exactly one line: " + chats);
+		h.assertTrue(containsKey(chats.get(0).content(), "munchaholic.command.reset.single"), "the command feedback line");
 		h.succeed();
 	}
 

@@ -272,18 +272,26 @@ class RollSelectorTest {
 
 	@Test
 	void mobilityGuardAlwaysApplies() {
-		// jump 90% at vanilla gravity and step height: 1.047-block jump < 1.05 -> vetoed in both modes
+		// jump 90% -> 80% at vanilla gravity and step height: 0.846-block jump < 1.02 -> vetoed in both modes
 		Recipe jumpDown = new Recipe(Caps.JUMP_STRENGTH, Direction.DOWN);
-		Capped c = assertInstanceOf(Capped.class, RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, jumpDown));
-		assertEquals(100.0, c.displayNow(), 1e-9);
+		PlayerStacks jump90 = PlayerStacks.EMPTY.withSteps(Caps.JUMP_STRENGTH, -1);
+		assertInstanceOf(Applied.class, RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, jumpDown),
+				"100% -> 90% jumps 1.047: allowed");
+		Capped c = assertInstanceOf(Capped.class, RollSelector.fixed(jump90, BaseLookup.VANILLA, jumpDown));
+		assertEquals(90.0, c.displayNow(), 1e-9);
 		int jump = Caps.ALL.indexOf(Caps.JUMP_STRENGTH);
 		Applied a = assertInstanceOf(Applied.class,
-				RollSelector.random(PlayerStacks.EMPTY, BaseLookup.VANILLA, scripted(jump, 1, 0, 0)));
+				RollSelector.random(jump90, BaseLookup.VANILLA, scripted(jump, 1, 0, 0)));
 		assertSame(Caps.SCALE, a.spec(), "jump DOWN vetoed -> a different attribute");
+		// gravity: 130% is the limit at 100% jump
+		PlayerStacks gravity130 = PlayerStacks.EMPTY.withSteps(Caps.GRAVITY, 3);
+		assertInstanceOf(Applied.class, RollSelector.fixed(PlayerStacks.EMPTY.withSteps(Caps.GRAVITY, 2), BaseLookup.VANILLA,
+				new Recipe(Caps.GRAVITY, Direction.UP)));
+		assertInstanceOf(Capped.class, RollSelector.fixed(gravity130, BaseLookup.VANILLA, new Recipe(Caps.GRAVITY, Direction.UP)));
 		// the same step is fine once gravity is lower, or step height alone climbs a block
-		PlayerStacks lowGravity = PlayerStacks.EMPTY.withSteps(Caps.GRAVITY, -1);
+		PlayerStacks lowGravity = jump90.withSteps(Caps.GRAVITY, -3);
 		assertInstanceOf(Applied.class, RollSelector.fixed(lowGravity, BaseLookup.VANILLA, jumpDown));
-		PlayerStacks highStep = PlayerStacks.EMPTY.withSteps(Caps.STEP_HEIGHT, 2);
+		PlayerStacks highStep = jump90.withSteps(Caps.STEP_HEIGHT, 2);
 		assertInstanceOf(Applied.class, RollSelector.fixed(highStep, BaseLookup.VANILLA, jumpDown));
 		// ... and step height can't then drop below a block while the jump is too weak
 		PlayerStacks weakJump = highStep.withSteps(Caps.JUMP_STRENGTH, -3);
@@ -298,7 +306,7 @@ class RollSelectorTest {
 		assertInstanceOf(Applied.class,
 				RollSelector.fixed(weakJump, BaseLookup.VANILLA, new Recipe(Caps.STEP_HEIGHT, Direction.UP)));
 		// an extra veto is combined with the guard, not instead of it
-		assertInstanceOf(Capped.class, RollSelector.fixed(PlayerStacks.EMPTY, BaseLookup.VANILLA, jumpDown, RollVeto.NONE));
+		assertInstanceOf(Capped.class, RollSelector.fixed(jump90, BaseLookup.VANILLA, jumpDown, RollVeto.NONE));
 	}
 
 	@Test
@@ -336,8 +344,7 @@ class RollSelectorTest {
 		// every spec at a point where both directions are legal, so rerolls never bias the draw
 		Map<String, Integer> start = new HashMap<>();
 		for (AttributeSpec spec : Caps.ALL) start.put(spec.key(), spec.minSteps(spec.playerBase()) < 0 ? 0 : 1);
-		// jump DOWN from 100% would drop below a 1.05-block jump (Mobility): start one step up
-		start.put(Caps.JUMP_STRENGTH.key(), 1);
+		// from 100% jump and gravity, jump DOWN (90%: 1.047 blocks) and gravity UP (110%) both keep a 1.02-block jump
 		PlayerStacks stacks = new PlayerStacks(start, 0);
 		for (AttributeSpec spec : Caps.ALL) {
 			for (Direction direction : Direction.values()) {

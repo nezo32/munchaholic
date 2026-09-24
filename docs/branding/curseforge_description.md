@@ -68,7 +68,7 @@ The mode is a **Munchaholic Mode** button on the Create World screen, right belo
 | **Burning Time** | 10% | 10% – 300% | lower |
 | **Luck** | 1 | -10 – 10 | higher |
 
-Percentages are relative to normal (100%). Caps count only your base value plus Munchaholic's own change: armor and potions don't count. A roll that would pass a cap rerolls another attribute in Random mode, and does nothing in Recipes mode (the message says it's at the limit).
+Percentages are relative to normal (100%). Caps count only your base value plus Munchaholic's own change: armor and potions don't count. A roll that would pass a cap rerolls another attribute in Random mode, and does nothing in Recipes mode (the message says it's at the limit). Two more checks work the same way: a roll never takes away your ability to climb a 1-block ledge (Jump Strength, Gravity and Step Height are checked together), and never makes you bigger than the space you're standing in. Only items with a food component and slices of cake count as food; blocks that feed you some other way (some modded pies) don't roll.
 
 ## Requirements
 
