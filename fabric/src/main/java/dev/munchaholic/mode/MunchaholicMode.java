@@ -1,5 +1,7 @@
 package dev.munchaholic.mode;
 
+import java.util.Objects;
+
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.munchaholic.Munchaholic;
@@ -44,7 +46,10 @@ public final class MunchaholicMode extends SavedData {
 	}
 
 	public void setEnabled(boolean value) {
-		throw new UnsupportedOperationException("TODO");
+		if (enabled != value) {
+			enabled = value;
+			setDirty();
+		}
 	}
 
 	public RollMode rollMode() {
@@ -52,7 +57,11 @@ public final class MunchaholicMode extends SavedData {
 	}
 
 	public void setRollMode(RollMode value) {
-		throw new UnsupportedOperationException("TODO");
+		Objects.requireNonNull(value, "value");
+		if (rollMode != value) {
+			rollMode = value;
+			setDirty();
+		}
 	}
 
 	public boolean keepOnDeath() {
@@ -60,40 +69,50 @@ public final class MunchaholicMode extends SavedData {
 	}
 
 	public void setKeepOnDeath(boolean value) {
-		throw new UnsupportedOperationException("TODO");
+		if (keepOnDeath != value) {
+			keepOnDeath = value;
+			setDirty();
+		}
 	}
 
 	public static MunchaholicMode get(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		return server.getDataStorage().computeIfAbsent(TYPE);
 	}
 
 	public static boolean isEnabled(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		return get(server).enabled();
 	}
 
 	/** Always marks dirty, so the file exists even when the value did not change. */
 	public static void setEnabled(MinecraftServer server, boolean value) {
-		throw new UnsupportedOperationException("TODO");
+		MunchaholicMode mode = get(server);
+		mode.setEnabled(value);
+		mode.setDirty();
 	}
 
 	public static RollMode rollMode(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		return get(server).rollMode();
 	}
 
 	public static void setRollMode(MinecraftServer server, RollMode value) {
-		throw new UnsupportedOperationException("TODO");
+		MunchaholicMode mode = get(server);
+		mode.setRollMode(value);
+		mode.setDirty();
 	}
 
 	public static boolean keepOnDeath(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		return get(server).keepOnDeath();
 	}
 
 	public static void setKeepOnDeath(MinecraftServer server, boolean value) {
-		throw new UnsupportedOperationException("TODO");
+		MunchaholicMode mode = get(server);
+		mode.setKeepOnDeath(value);
+		mode.setDirty();
 	}
 
 	/** enabled && rollMode == RECIPES: whether recipe tooltips are shown to clients. */
 	public static boolean recipesActive(MinecraftServer server) {
-		throw new UnsupportedOperationException("TODO");
+		MunchaholicMode mode = get(server);
+		return mode.enabled() && mode.rollMode() == RollMode.RECIPES;
 	}
 }
