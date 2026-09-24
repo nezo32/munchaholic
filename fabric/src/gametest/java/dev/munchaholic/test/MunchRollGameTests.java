@@ -44,10 +44,13 @@ import net.minecraft.world.item.Items;
  * and the caps holding under long random walks, including walks that start at the limits.
  */
 public class MunchRollGameTests {
-	private static final ItemStack BREAD = new ItemStack(Items.BREAD);
+	/** A fresh bread stack (not a static field: item components are bound only after registries load). */
+	private static ItemStack bread() {
+		return new ItemStack(Items.BREAD);
+	}
 
 	private static RollOutcome bite(ServerPlayer p, RandomIndex random) {
-		return BiteHandler.bite(p, BREAD, random);
+		return BiteHandler.bite(p, bread(), random);
 	}
 
 	/** Every spec rolled UP once from 0 (scripted: pick spec 0 of the remaining list, UP): op and amount per spec. */

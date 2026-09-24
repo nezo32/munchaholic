@@ -12,7 +12,9 @@ import static dev.munchaholic.test.TestSupport.survivalPlayer;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.serialization.JsonOps;
 import dev.munchaholic.core.AttributeSpec;
 import dev.munchaholic.core.Caps;
@@ -153,7 +155,9 @@ public class MunchDeathGameTests {
 		TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, level.registryAccess());
 		p.saveWithoutId(out);
 		CompoundTag tag = out.buildResult();
-		ServerPlayer fresh = new ServerPlayer(level.getServer(), level, p.getGameProfile(), ClientInformation.createDefault());
+		// a different UUID: a ServerPlayer with the same profile would take over the live player's PlayerAdvancements
+		GameProfile profile = new GameProfile(UUID.randomUUID(), "munch-reloaded");
+		ServerPlayer fresh = new ServerPlayer(level.getServer(), level, profile, ClientInformation.createDefault());
 		fresh.load(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), tag));
 		h.assertValueEqual(fresh.getAttachedOrElse(MunchAttachments.STACKS, PlayerStacks.EMPTY),
 				new PlayerStacks(BUILD.steps(), 5), "stacks after load");
