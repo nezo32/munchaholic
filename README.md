@@ -6,7 +6,7 @@
 
 <p align="center"><em>Take a bite. Roll a stat. Never stop.</em></p>
 
-Munchaholic is a Minecraft mod in which each food you finish eating permanently buffs or debuffs one of your player
+Munchaholic is a Minecraft mode in which each food you finish eating permanently buffs or debuffs one of your player
 attributes: size, gravity, jump, speed, max health, reach and more. The changes keep stacking, up to a safety cap.
 
 It's a Fabric mod for Minecraft Java 26.2–26.3 (in [`fabric/`](fabric/), see [fabric/README.md](fabric/README.md)).
