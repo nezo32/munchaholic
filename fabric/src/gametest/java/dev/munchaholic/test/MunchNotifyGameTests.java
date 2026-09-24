@@ -42,7 +42,10 @@ public class MunchNotifyGameTests {
 	private static final RollOutcome.Capped SCALE_CAPPED =
 			new RollOutcome.Capped(Caps.SCALE, Direction.DOWN, -10, Caps.SCALE.playerBase());
 
-	private static final ItemStack BREAD = new ItemStack(Items.BREAD);
+	/** A fresh bread stack (not a static field: item components are bound only after registries load). */
+	private static ItemStack bread() {
+		return new ItemStack(Items.BREAD);
+	}
 
 	private static TranslatableContents tc(Component c) {
 		if (!(c.getContents() instanceof TranslatableContents t)) throw new AssertionError("not translatable: " + c);
@@ -64,9 +67,9 @@ public class MunchNotifyGameTests {
 		for (RollOutcome o : List.<RollOutcome>of(GRAVITY_DOWN, SCALE_DOWN, SCALE_CAPPED)) {
 			TestSupport.Mock mock = mockPlayer(h);
 			h.assertTrue(!ServerPlayNetworking.canSend(mock.player(), RolledPayload.TYPE), "mock player has no munchaholic channel");
-			Feedback.send(mock.player(), BREAD, o);
+			Feedback.send(mock.player(), bread(), o);
 			List<Object> out = mock.drain();
-			Component expected = Feedback.message(BREAD, o);
+			Component expected = Feedback.message(bread(), o);
 			List<ClientboundSystemChatPacket> overlays = TestSupport.Mock.overlays(out);
 			h.assertValueEqual(overlays.size(), 1, "overlay packets for " + o + "; outbound=" + out);
 			h.assertValueEqual(overlays.get(0).content(), expected, "overlay content");
@@ -86,11 +89,11 @@ public class MunchNotifyGameTests {
 	@GameTest
 	public void moddedClientGetsPayloadOnly(GameTestHelper h) {
 		TestSupport.Mock mock = mockPlayer(h);
-		Feedback.send(mock.player(), BREAD, SCALE_DOWN, true);
+		Feedback.send(mock.player(), bread(), SCALE_DOWN, true);
 		List<Object> out = mock.drain();
 		List<RolledPayload> payloads = TestSupport.Mock.payloads(out, RolledPayload.class);
 		h.assertValueEqual(payloads.size(), 1, "rolled payloads; outbound=" + out);
-		h.assertValueEqual(payloads.get(0).message(), Feedback.message(BREAD, SCALE_DOWN), "payload message");
+		h.assertValueEqual(payloads.get(0).message(), Feedback.message(bread(), SCALE_DOWN), "payload message");
 		h.assertValueEqual(payloads.get(0).tone(), Feedback.TONE_DEBUFF, "payload tone");
 		h.assertTrue(TestSupport.Mock.overlays(out).isEmpty(), "no overlay packet; outbound=" + out);
 		h.assertTrue(out.stream().noneMatch(m -> m instanceof ClientboundSoundPacket), "no sound packet; outbound=" + out);
@@ -115,7 +118,7 @@ public class MunchNotifyGameTests {
 
 	@GameTest
 	public void rolledPayloadCodecRoundTrip(GameTestHelper h) {
-		Component msg = Feedback.message(BREAD, GRAVITY_DOWN);
+		Component msg = Feedback.message(bread(), GRAVITY_DOWN);
 		RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), h.getLevel().registryAccess());
 		try {
 			RolledPayload.CODEC.encode(buf, new RolledPayload(msg, Feedback.TONE_BUFF));
@@ -136,11 +139,11 @@ public class MunchNotifyGameTests {
 	/** Food GOLD, attribute name WHITE, change GREEN for a buff / RED for a debuff, "now" GRAY, outer LIGHT_PURPLE. */
 	@GameTest
 	public void messageArgumentsAndColors(GameTestHelper h) {
-		Component buff = Feedback.message(BREAD, GRAVITY_DOWN);
+		Component buff = Feedback.message(bread(), GRAVITY_DOWN);
 		h.assertValueEqual(tc(buff).getArgs().length, 4, "4 args");
 		h.assertValueEqual(buff.getStyle().getColor(), color(ChatFormatting.LIGHT_PURPLE), "outer color");
 		h.assertValueEqual(arg(buff, 0).getStyle().getColor(), color(ChatFormatting.GOLD), "food color");
-		h.assertValueEqual(arg(buff, 0).getString(), BREAD.getHoverName().getString(), "food name");
+		h.assertValueEqual(arg(buff, 0).getString(), bread().getHoverName().getString(), "food name");
 		h.assertValueEqual(tc(arg(buff, 1)).getKey(), "attribute.name.gravity", "attribute key (vanilla)");
 		h.assertValueEqual(arg(buff, 2).getStyle().getColor(), color(ChatFormatting.GREEN), "gravity DOWN is a buff");
 		h.assertValueEqual(arg(buff, 2).getString(), "-10%", "gravity change text");
@@ -148,11 +151,11 @@ public class MunchNotifyGameTests {
 		h.assertValueEqual(tc(arg(buff, 3)).getKey(), "munchaholic.message.now", "now key");
 		h.assertValueEqual(arg(buff, 3).getString(), "(now 90%)", "now text (English fallback)");
 
-		Component debuff = Feedback.message(BREAD, SCALE_DOWN);
+		Component debuff = Feedback.message(bread(), SCALE_DOWN);
 		h.assertValueEqual(arg(debuff, 2).getStyle().getColor(), color(ChatFormatting.RED), "scale DOWN is a debuff");
 		h.assertValueEqual(arg(debuff, 2).getString(), "-8%", "scale change text");
 		h.assertValueEqual(arg(debuff, 3).getString(), "(now 92%)", "scale now text");
-		h.assertValueEqual(debuff.getString(), "✦ " + BREAD.getHoverName().getString() + " → Scale -8% (now 92%)",
+		h.assertValueEqual(debuff.getString(), "✦ " + bread().getHoverName().getString() + " → Scale -8% (now 92%)",
 				"whole message (server has only the fallbacks and vanilla attribute names)");
 
 		h.assertValueEqual(Feedback.tone(GRAVITY_DOWN), Feedback.TONE_BUFF, "tone buff");
@@ -166,14 +169,14 @@ public class MunchNotifyGameTests {
 
 	@GameTest
 	public void cappedAndNothingMessages(GameTestHelper h) {
-		Component capped = Feedback.message(BREAD, SCALE_CAPPED);
+		Component capped = Feedback.message(bread(), SCALE_CAPPED);
 		h.assertValueEqual(tc(capped).getKey(), "munchaholic.message.capped", "capped key");
 		h.assertValueEqual(tc(capped).getFallback(), "✦ %1$s → %2$s %3$s (at the limit: %4$s)", "capped fallback");
 		h.assertValueEqual(arg(capped, 2).getStyle().getColor(), color(ChatFormatting.GRAY), "capped change is gray");
 		h.assertValueEqual(arg(capped, 3).getString(), "20%", "capped limit text");
 		h.assertValueEqual(Feedback.tone(SCALE_CAPPED), Feedback.TONE_NEUTRAL, "capped tone");
 
-		Component nothing = Feedback.message(BREAD, RollOutcome.Nothing.INSTANCE);
+		Component nothing = Feedback.message(bread(), RollOutcome.Nothing.INSTANCE);
 		h.assertValueEqual(tc(nothing).getKey(), "munchaholic.message.nothing", "nothing key");
 		h.assertValueEqual(tc(nothing).getFallback(), "✦ %s → nothing left to change", "nothing fallback");
 		h.assertValueEqual(Feedback.tone(RollOutcome.Nothing.INSTANCE), Feedback.TONE_NEUTRAL, "nothing tone");

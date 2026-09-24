@@ -57,9 +57,14 @@ public class MunchModeGameTests {
 		return server(h).createCommandSourceStack().withPermission(PermissionSet.NO_PERMISSIONS);
 	}
 
-	/** A player selector that matches exactly this player, whatever the other mock players are called. */
+	/**
+	 * A player-only selector that matches exactly this player, whatever the other mock players are called (a UUID is
+	 * rejected by EntityArgument.player(): vanilla treats UUID selectors as "may include entities").
+	 */
 	private static String target(ServerPlayer p) {
-		return p.getStringUUID();
+		String tag = "munch_" + p.getStringUUID().substring(0, 8);
+		p.addTag(tag);
+		return "@a[tag=" + tag + ",limit=1]";
 	}
 
 	private static void assertFails(GameTestHelper h, CommandSourceStack source, String command, String who) {
