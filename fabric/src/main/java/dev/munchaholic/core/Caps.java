@@ -59,6 +59,10 @@ public final class Caps {
 
 	/** The spec with this attribute key (e.g. {@code "scale"}); empty for unknown keys. */
 	public static Optional<AttributeSpec> byKey(String key) {
-		throw new UnsupportedOperationException("TODO");
+		if (key == null) return Optional.empty();
+		for (AttributeSpec spec : ALL) {
+			if (spec.key().equals(key)) return Optional.of(spec);
+		}
+		return Optional.empty();
 	}
 }
