@@ -1,0 +1,406 @@
+package dev.munchaholic.test;
+
+import static dev.munchaholic.test.TestSupport.EPS;
+import static dev.munchaholic.test.TestSupport.assertModifiersMatch;
+import static dev.munchaholic.test.TestSupport.bites;
+import static dev.munchaholic.test.TestSupport.defaults;
+import static dev.munchaholic.test.TestSupport.instance;
+import static dev.munchaholic.test.TestSupport.itemWithRecipe;
+import static dev.munchaholic.test.TestSupport.modifier;
+import static dev.munchaholic.test.TestSupport.modifierAmount;
+import static dev.munchaholic.test.TestSupport.munchValue;
+import static dev.munchaholic.test.TestSupport.noRandom;
+import static dev.munchaholic.test.TestSupport.script;
+import static dev.munchaholic.test.TestSupport.server;
+import static dev.munchaholic.test.TestSupport.steps;
+import static dev.munchaholic.test.TestSupport.survivalPlayer;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import dev.munchaholic.BiteHandler;
+import dev.munchaholic.core.AttributeSpec;
+import dev.munchaholic.core.Caps;
+import dev.munchaholic.core.Direction;
+import dev.munchaholic.core.ModifierOp;
+import dev.munchaholic.core.PlayerStacks;
+import dev.munchaholic.core.RandomIndex;
+import dev.munchaholic.core.Recipe;
+import dev.munchaholic.core.RollMode;
+import dev.munchaholic.core.RollOutcome;
+import dev.munchaholic.mode.MunchaholicMode;
+import dev.munchaholic.player.AttributeHolders;
+import dev.munchaholic.player.MunchAttachments;
+import dev.munchaholic.player.PlayerHooks;
+import dev.munchaholic.player.PlayerMunch;
+import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.RangedAttribute;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Random-mode rolls on a real player: modifiers derived from integer steps (D1/D2), stacking, the capped reroll (D6)
+ * and the caps holding under long random walks, including walks that start at the limits.
+ */
+public class MunchRollGameTests {
+	/** A fresh bread stack (not a static field: item components are bound only after registries load). */
+	private static ItemStack bread() {
+		return new ItemStack(Items.BREAD);
+	}
+
+	private static RollOutcome bite(ServerPlayer p, RandomIndex random) {
+		return BiteHandler.bite(p, bread(), random);
+	}
+
+	/** Every spec rolled UP once from 0 (scripted: pick spec 0 of the remaining list, UP): op and amount per spec. */
+	@GameTest
+	public void modifierMatchesSteps(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		for (int i = 0; i < Caps.ALL.size(); i++) {
+			AttributeSpec spec = Caps.ALL.get(i);
+			RollOutcome o = bite(p, script(i, 0));
+			h.assertTrue(o instanceof RollOutcome.Applied a && a.spec() == spec && a.direction() == Direction.UP
+					&& a.oldSteps() == 0 && a.newSteps() == 1, "bite " + i + " outcome " + o);
+			AttributeModifier m = modifier(p, spec);
+			h.assertTrue(m != null, spec.key() + ": no modifier");
+			h.assertTrue(Math.abs(m.amount() - spec.step()) < EPS, spec.key() + ": amount " + m.amount());
+			AttributeModifier.Operation expectedOp = spec.op() == ModifierOp.ADD_VALUE
+					? AttributeModifier.Operation.ADD_VALUE : AttributeModifier.Operation.ADD_MULTIPLIED_BASE;
+			h.assertValueEqual(m.operation(), expectedOp, spec.key() + ": operation");
+			h.assertValueEqual(PlayerMunch.op(spec), expectedOp, spec.key() + ": PlayerMunch.op");
+			AttributeInstance inst = instance(p, spec);
+			double expected = spec.valueAt(inst.getBaseValue(), 1);
+			h.assertTrue(Math.abs(inst.getValue() - expected) < EPS,
+					spec.key() + ": value " + inst.getValue() + ", expected " + expected);
+		}
+		h.assertValueEqual(bites(p), Caps.ALL.size(), "bites");
+		assertModifiersMatch(h, p, "after 20 scripted bites");
+		h.succeed();
+	}
+
+	/** One modifier per attribute: two scale UP rolls replace it with the new total (D1). */
+	@GameTest
+	public void stackingSameAttribute(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		bite(p, script(0, 0));
+		bite(p, script(0, 0));
+		AttributeInstance scale = instance(p, Caps.SCALE);
+		long ours = scale.getModifiers().stream().filter(m -> m.is(PlayerMunch.MODIFIER_ID)).count();
+		h.assertValueEqual(ours, 1L, "munchaholic:bites modifiers on scale");
+		h.assertTrue(Math.abs(modifierAmount(p, Caps.SCALE) - 0.16) < EPS, "amount " + modifierAmount(p, Caps.SCALE));
+		h.assertTrue(Math.abs(scale.getValue() - 1.16) < EPS, "scale value " + scale.getValue());
+		h.assertValueEqual(steps(p, Caps.SCALE), 2, "scale steps");
+		h.assertValueEqual(bites(p), 2, "bites");
+		h.succeed();
+	}
+
+	@GameTest
+	public void stackingOppositeCancels(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		bite(p, script(0, 0));
+		bite(p, script(0, 1));
+		h.assertTrue(modifier(p, Caps.SCALE) == null, "modifier removed at 0 steps");
+		h.assertTrue(PlayerMunch.stacks(p).isEmpty(), "stacks empty: " + PlayerMunch.stacks(p));
+		h.assertValueEqual(bites(p), 2, "bites still counted");
+		h.assertTrue(Math.abs(instance(p, Caps.SCALE).getValue() - 1.0) < EPS, "scale back to 1");
+		h.succeed();
+	}
+
+	/** Armor DOWN at 0 is capped: armor leaves the candidates and a different attribute (scale, index 0) is rolled. */
+	@GameTest
+	public void cappedRerollsOtherAttribute(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		h.assertValueEqual(Caps.ALL.indexOf(Caps.ARMOR), 9, "armor index in Caps.ALL");
+		RollOutcome o = bite(p, script(9, 1, 0, 0));
+		h.assertTrue(o instanceof RollOutcome.Applied a && a.spec() == Caps.SCALE && a.direction() == Direction.UP,
+				"outcome " + o);
+		h.assertValueEqual(steps(p, Caps.ARMOR), 0, "armor steps");
+		h.assertValueEqual(steps(p, Caps.SCALE), 1, "scale steps");
+		h.succeed();
+	}
+
+	/** 2000 real bites with the player's own RandomSource: every munch value stays inside its cap range. */
+	@GameTest(maxTicks = 400)
+	public void capsHoldUnderRandomWalk(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		RandomIndex random = p.getRandom()::nextInt;
+		for (int i = 0; i < 2000; i++) {
+			RollOutcome o = bite(p, random);
+			h.assertTrue(o instanceof RollOutcome.Applied, "bite " + i + " gave " + o);
+			assertInsideCaps(h, p, "bite " + i);
+		}
+		h.assertValueEqual(bites(p), 2000, "bites");
+		assertModifiersMatch(h, p, "after 2000 bites");
+		assertSafe(h, p, "after 2000 bites");
+		h.succeed();
+	}
+
+	/**
+	 * Every attribute starts at its upper limit, then at its lower limit; 300 seeded bites each. No roll may push past a
+	 * cap (capped picks are rerolled), and the walk only moves back inside.
+	 */
+	@GameTest(maxTicks = 400)
+	public void capsHoldFromTheLimits(GameTestHelper h) {
+		defaults(h);
+		for (boolean upper : new boolean[] {true, false}) {
+			ServerPlayer p = survivalPlayer(h);
+			Map<String, Integer> start = new HashMap<>();
+			for (AttributeSpec spec : Caps.ALL) {
+				double base = PlayerMunch.base(p, spec);
+				start.put(spec.key(), upper ? spec.maxSteps(base) : spec.minSteps(base));
+			}
+			PlayerMunch.setStacks(p, new PlayerStacks(start, 0));
+			assertInsideCaps(h, p, (upper ? "upper" : "lower") + " start");
+			assertModifiersMatch(h, p, (upper ? "upper" : "lower") + " start");
+			Random random = new Random(upper ? 1L : 2L);
+			for (int i = 0; i < 300; i++) {
+				RollOutcome o = bite(p, random::nextInt);
+				if (o instanceof RollOutcome.Applied a) {
+					h.assertTrue(a.spec().canStep(a.base(), a.oldSteps(), a.direction()), "illegal step applied: " + a);
+					if (i == 0) {
+						// the very first roll from all-at-the-limit must move one attribute back inside
+						h.assertValueEqual(a.direction(), upper ? Direction.DOWN : Direction.UP, "first direction from the limit");
+					}
+				} else {
+					h.fail("bite " + i + " from the " + (upper ? "upper" : "lower") + " limits gave " + o);
+				}
+				assertInsideCaps(h, p, (upper ? "upper" : "lower") + " bite " + i);
+			}
+			assertModifiersMatch(h, p, (upper ? "upper" : "lower") + " walk");
+			assertSafe(h, p, (upper ? "upper" : "lower") + " walk");
+		}
+		h.succeed();
+	}
+
+	private static void assertInsideCaps(GameTestHelper h, ServerPlayer p, String what) {
+		for (AttributeSpec spec : Caps.ALL) {
+			double base = PlayerMunch.base(p, spec);
+			int s = steps(p, spec);
+			double v = munchValue(p, spec);
+			if (!spec.inRange(v) || s < spec.minSteps(base) || s > spec.maxSteps(base)) {
+				h.fail(what + ": " + spec.key() + " at " + s + " steps = " + v + ", outside [" + spec.min() + ", " + spec.max() + "]");
+			}
+		}
+	}
+
+	/** The safety floors from §2, checked on the live attribute values. */
+	private static void assertSafe(GameTestHelper h, ServerPlayer p, String what) {
+		h.assertTrue(p.getMaxHealth() >= 2.0F, what + ": max health " + p.getMaxHealth());
+		h.assertTrue(p.getAttributeValue(Attributes.MOVEMENT_SPEED) > 0, what + ": speed");
+		h.assertTrue(p.getAttributeValue(Attributes.GRAVITY) > 0, what + ": gravity");
+		h.assertTrue(p.getAttributeValue(Attributes.SCALE) >= 0.15, what + ": scale");
+		h.assertTrue(p.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) >= 1.0, what + ": block range");
+		h.assertTrue(p.getAttributeValue(Attributes.ENTITY_INTERACTION_RANGE) >= 1.0, what + ": entity range");
+	}
+
+	/** A max_health drop below the current health is clamped by vanilla on the player's next tick. */
+	@GameTest
+	public void maxHealthDropClampsHealth(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		p.setHealth(20.0F);
+		PlayerMunch.setStacks(p, PlayerStacks.EMPTY.withSteps(Caps.MAX_HEALTH, -8));
+		int index = Caps.ALL.indexOf(Caps.MAX_HEALTH);
+		RollOutcome o = bite(p, script(index, 1));
+		h.assertTrue(o instanceof RollOutcome.Applied a && a.spec() == Caps.MAX_HEALTH && a.newSteps() == -9, "outcome " + o);
+		h.assertTrue(Math.abs(p.getMaxHealth() - 2.0F) < EPS, "max health " + p.getMaxHealth());
+		p.doTick();
+		h.assertTrue(p.getHealth() <= p.getMaxHealth(), "health " + p.getHealth() + " > max " + p.getMaxHealth());
+		h.assertTrue(p.getHealth() > 0, "still alive");
+		// one more DOWN is capped (2 hp is the floor): the script must fall through to another attribute
+		RollOutcome again = bite(p, script(index, 1, 0, 0));
+		h.assertTrue(again instanceof RollOutcome.Applied a && a.spec() == Caps.SCALE, "at the max_health floor: " + again);
+		h.assertValueEqual(steps(p, Caps.MAX_HEALTH), -9, "max_health steps at the floor");
+		h.succeed();
+	}
+
+	/** setStacks refreshes dimensions when scale changes, so the hitbox is right immediately. */
+	@GameTest
+	public void scaleChangesHitbox(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		float before = p.getBbWidth();
+		bite(p, script(0, 0));
+		float after = p.getBbWidth();
+		h.assertTrue(Math.abs(after - before * 1.08F) < 1e-3, "width " + before + " -> " + after + ", expected x1.08");
+		bite(p, script(0, 1));
+		h.assertTrue(Math.abs(p.getBbWidth() - before) < 1e-3, "width back to " + before + ": " + p.getBbWidth());
+		h.succeed();
+	}
+
+	/** All 20 attributes exist on players, have the right id and base, and our caps lie inside vanilla's ranges. */
+	@GameTest
+	public void capsInsideVanillaRanges(GameTestHelper h) {
+		ServerPlayer p = survivalPlayer(h);
+		for (AttributeSpec spec : Caps.ALL) {
+			Holder<Attribute> holder = AttributeHolders.of(spec);
+			String id = holder.unwrapKey().orElseThrow().identifier().toString();
+			h.assertValueEqual(id, "minecraft:" + spec.key(), "attribute id");
+			h.assertValueEqual(holder.value().getDescriptionId(), spec.translationKey(), spec.key() + " translation key");
+			AttributeInstance inst = p.getAttribute(holder);
+			h.assertTrue(inst != null, spec.key() + ": player has no instance");
+			h.assertTrue(Math.abs(inst.getBaseValue() - spec.playerBase()) < 1e-9,
+					spec.key() + ": player base " + inst.getBaseValue() + " != table " + spec.playerBase());
+			h.assertTrue(holder.value() instanceof RangedAttribute, spec.key() + " is not a RangedAttribute");
+			RangedAttribute ranged = (RangedAttribute) holder.value();
+			h.assertTrue(ranged.getMinValue() <= spec.min() && spec.max() <= ranged.getMaxValue(),
+					spec.key() + ": cap [" + spec.min() + ", " + spec.max() + "] outside vanilla [" + ranged.getMinValue()
+							+ ", " + ranged.getMaxValue() + "]");
+		}
+		h.succeed();
+	}
+
+	/** JOIN repairs a modifier removed by hand (or by another mod) and rebalances a wrong amount (D2). */
+	@GameTest
+	public void joinReappliesModifiers(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		PlayerMunch.setStacks(p, PlayerStacks.EMPTY.withSteps(Caps.SCALE, 1).withSteps(Caps.ARMOR, 3));
+		instance(p, Caps.SCALE).removeModifier(PlayerMunch.MODIFIER_ID);
+		instance(p, Caps.ARMOR).addOrReplacePermanentModifier(
+				new AttributeModifier(PlayerMunch.MODIFIER_ID, 99.0, AttributeModifier.Operation.ADD_VALUE));
+		instance(p, Caps.LUCK).addOrReplacePermanentModifier(
+				new AttributeModifier(PlayerMunch.MODIFIER_ID, 5.0, AttributeModifier.Operation.ADD_VALUE));
+		PlayerHooks.onJoin(p);
+		h.assertTrue(Math.abs(modifierAmount(p, Caps.SCALE) - 0.08) < EPS, "scale modifier repaired");
+		h.assertTrue(Math.abs(modifierAmount(p, Caps.ARMOR) - 3.0) < EPS, "armor modifier rebalanced");
+		h.assertTrue(modifier(p, Caps.LUCK) == null, "stray modifier on a 0-step attribute removed");
+		assertModifiersMatch(h, p, "after onJoin");
+		h.succeed();
+	}
+
+	/** The stacks attachment was lost but the modifiers survived: onJoin rebuilds the steps from them (bites restart at 0). */
+	@GameTest
+	public void joinRebuildsLostStacks(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		PlayerStacks build = PlayerStacks.EMPTY.withSteps(Caps.SCALE, 2).withSteps(Caps.ARMOR, 3).withSteps(Caps.LUCK, -2)
+				.withSteps(Caps.MOVEMENT_SPEED, -1);
+		PlayerMunch.setStacks(p, new PlayerStacks(build.steps(), 7));
+		p.removeAttached(MunchAttachments.STACKS);
+		h.assertTrue(!p.hasAttached(MunchAttachments.STACKS), "attachment removed");
+		h.assertTrue(modifier(p, Caps.SCALE) != null, "modifiers still there");
+		PlayerHooks.onJoin(p);
+		h.assertTrue(p.hasAttached(MunchAttachments.STACKS), "attachment rebuilt");
+		h.assertValueEqual(PlayerMunch.stacks(p), new PlayerStacks(build.steps(), 0), "steps rebuilt, bites restart at 0");
+		assertModifiersMatch(h, p, "after the rebuild");
+		h.assertTrue(Math.abs(modifierAmount(p, Caps.SCALE) - 0.16) < EPS, "scale modifier kept");
+		h.succeed();
+	}
+
+	/**
+	 * Growth must fit (§2 veto 2): with a ceiling right above the player's head, scale UP is refused. Recipes mode shows
+	 * the capped message, Random mode rolls a different attribute. In open air the same growth is allowed.
+	 */
+	@GameTest
+	public void ceilingBlocksGrowth(GameTestHelper h) {
+		defaults(h);
+		ServerPlayer p = survivalPlayer(h);
+		// feet at relative y 2.15, head at 3.95: a block at y 4 leaves 0.05, too little for +8% (1.8 -> 1.944)
+		h.setBlock(new BlockPos(1, 4, 1), Blocks.STONE);
+		Vec3 feet = h.absoluteVec(new Vec3(1.5, 2.15, 1.5));
+		p.snapTo(feet.x, feet.y, feet.z, 0.0F, 0.0F);
+		h.assertTrue(p.level().noCollision(p, p.getBoundingBox()), "the player fits under the ceiling now");
+		h.assertTrue(!PlayerMunch.fitsWithScaleSteps(p, 1), "one scale step up would not fit");
+		h.assertTrue(PlayerMunch.fitsWithScaleSteps(p, -1), "shrinking always fits");
+		float width = p.getBbWidth();
+		ItemStack growFood = itemWithRecipe(h, new Recipe(Caps.SCALE, Direction.UP));
+		try {
+			MunchaholicMode.setRollMode(server(h), RollMode.RECIPES);
+			RollOutcome capped = BiteHandler.bite(p, growFood, noRandom());
+			h.assertTrue(capped instanceof RollOutcome.Capped c && c.spec() == Caps.SCALE && c.direction() == Direction.UP
+					&& c.steps() == 0, "Recipes: " + capped);
+			h.assertValueEqual(steps(p, Caps.SCALE), 0, "Recipes: scale steps");
+			h.assertValueEqual(bites(p), 1, "Recipes: the bite counts");
+
+			MunchaholicMode.setRollMode(server(h), RollMode.RANDOM);
+			// scale UP vetoed -> scale removed, the next draw picks index 0 of the rest (gravity), UP
+			RollOutcome other = bite(p, script(0, 0, 0, 0));
+			h.assertTrue(other instanceof RollOutcome.Applied a && a.spec() == Caps.GRAVITY && a.direction() == Direction.UP,
+					"Random: " + other);
+			h.assertValueEqual(steps(p, Caps.SCALE), 0, "Random: scale steps");
+			h.assertTrue(Math.abs(p.getBbWidth() - width) < 1e-6, "hitbox unchanged");
+
+			// out in the open the same growth is fine
+			p.snapTo(TestSupport.OPEN_AIR_X, TestSupport.OPEN_AIR_Y, TestSupport.OPEN_AIR_Z, 0.0F, 0.0F);
+			MunchaholicMode.setRollMode(server(h), RollMode.RECIPES);
+			RollOutcome grown = BiteHandler.bite(p, growFood, noRandom());
+			h.assertTrue(grown instanceof RollOutcome.Applied a && a.spec() == Caps.SCALE, "open air: " + grown);
+		} finally {
+			defaults(h);
+		}
+		h.succeed();
+	}
+
+	/**
+	 * The ledge rule end to end (§2 veto 1): at the lowest allowed jump (90% at normal gravity and step height), jump
+	 * DOWN and gravity UP are refused in both modes; one step earlier jump DOWN was still allowed.
+	 */
+	@GameTest
+	public void mobilityGuardEndToEnd(GameTestHelper h) {
+		defaults(h);
+		ItemStack jumpDownFood = itemWithRecipe(h, new Recipe(Caps.JUMP_STRENGTH, Direction.DOWN));
+		ItemStack gravityUpFood = itemWithRecipe(h, new Recipe(Caps.GRAVITY, Direction.UP));
+		try {
+			MunchaholicMode.setRollMode(server(h), RollMode.RECIPES);
+			ServerPlayer p = survivalPlayer(h);
+			RollOutcome first = BiteHandler.bite(p, jumpDownFood, noRandom());
+			h.assertTrue(first instanceof RollOutcome.Applied a && a.spec() == Caps.JUMP_STRENGTH && a.newSteps() == -1,
+					"100% -> 90% jump is allowed: " + first);
+			h.assertTrue(Math.abs(munchValue(p, Caps.JUMP_STRENGTH) - 0.42F * 0.9) < 1e-6, "jump at 90%");
+
+			RollOutcome jumpDown = BiteHandler.bite(p, jumpDownFood, noRandom());
+			h.assertTrue(jumpDown instanceof RollOutcome.Capped c && c.spec() == Caps.JUMP_STRENGTH
+					&& c.direction() == Direction.DOWN && c.steps() == -1, "Recipes jump DOWN at 90%: " + jumpDown);
+			RollOutcome gravityUp = BiteHandler.bite(p, gravityUpFood, noRandom());
+			h.assertTrue(gravityUp instanceof RollOutcome.Capped c && c.spec() == Caps.GRAVITY
+					&& c.direction() == Direction.UP && c.steps() == 0, "Recipes gravity UP at 90% jump: " + gravityUp);
+			h.assertValueEqual(steps(p, Caps.JUMP_STRENGTH), -1, "jump steps unchanged");
+			h.assertValueEqual(steps(p, Caps.GRAVITY), 0, "gravity steps unchanged");
+			h.assertValueEqual(bites(p), 3, "every bite counts");
+
+			MunchaholicMode.setRollMode(server(h), RollMode.RANDOM);
+			int jump = Caps.ALL.indexOf(Caps.JUMP_STRENGTH);
+			int gravity = Caps.ALL.indexOf(Caps.GRAVITY);
+			// vetoed -> that attribute is removed, the next draw picks index 0 of the rest (scale), UP (open air: fits)
+			RollOutcome r1 = bite(p, script(jump, 1, 0, 0));
+			h.assertTrue(r1 instanceof RollOutcome.Applied a && a.spec() == Caps.SCALE, "Random jump DOWN: " + r1);
+			RollOutcome r2 = bite(p, script(gravity, 0, 0, 0));
+			h.assertTrue(r2 instanceof RollOutcome.Applied a && a.spec() == Caps.SCALE, "Random gravity UP: " + r2);
+			h.assertValueEqual(steps(p, Caps.JUMP_STRENGTH), -1, "Random: jump steps unchanged");
+			h.assertValueEqual(steps(p, Caps.GRAVITY), 0, "Random: gravity steps unchanged");
+			h.assertValueEqual(steps(p, Caps.SCALE), 2, "Random: scale took both rolls");
+		} finally {
+			defaults(h);
+		}
+		h.succeed();
+	}
+
+	/** PlayerMunch.base reads the live base value (a changed base shifts the cap math), BaseLookup delegates to it. */
+	@GameTest
+	public void basesAreLive(GameTestHelper h) {
+		ServerPlayer p = survivalPlayer(h);
+		for (AttributeSpec spec : Caps.ALL) {
+			h.assertTrue(Math.abs(PlayerMunch.bases(p).base(spec) - PlayerMunch.base(p, spec)) < 1e-12, spec.key() + " bases()");
+		}
+		instance(p, Caps.MAX_HEALTH).setBaseValue(30.0);
+		h.assertTrue(Math.abs(PlayerMunch.base(p, Caps.MAX_HEALTH) - 30.0) < 1e-12, "live base");
+		h.succeed();
+	}
+}

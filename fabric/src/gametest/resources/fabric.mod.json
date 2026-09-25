@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "munchaholic-gametest",
+	"version": "1.0.0",
+	"name": "Munchaholic GameTests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"dev.munchaholic.test.MunchEatingGameTests",
+			"dev.munchaholic.test.MunchRollGameTests",
+			"dev.munchaholic.test.MunchDeathGameTests",
+			"dev.munchaholic.test.MunchRecipesGameTests",
+			"dev.munchaholic.test.MunchModeGameTests",
+			"dev.munchaholic.test.MunchNotifyGameTests"
+		],
+		"fabric-client-gametest": [
+			"dev.munchaholic.test.MunchaholicClientGameTest",
+			"dev.munchaholic.test.MunchaholicNotifyClientGameTest",
+			"dev.munchaholic.test.MunchaholicTooltipClientGameTest"
+		]
+	},
+	"depends": {
+		"munchaholic": "*"
+	}
+}
